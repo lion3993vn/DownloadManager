@@ -72,7 +72,7 @@ if (dry) {
 }
 
 // Keep Cargo.lock in sync with the new workspace version (best effort).
-const cargo = spawnSync("cargo", ["update", "--workspace", "--offline"], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+const cargo = spawnSync("cargo", ["update", "--workspace", "--offline"], { cwd: root, stdio: "inherit" });
 if (cargo.status !== 0) console.warn("! could not update Cargo.lock (cargo not found?), continuing");
 
 git("add", "package.json", "src-tauri/tauri.conf.json", "extension/manifest.json", "Cargo.toml", "Cargo.lock", "CHANGELOG.md");
@@ -87,11 +87,18 @@ const notes = execFileSync(process.execPath, [join(root, "scripts", "release-not
   cwd: root,
   encoding: "utf8",
 });
-const draft = spawnSync(
-  "gh",
-  ["release", "create", `v${next}`, "--draft", "--verify-tag", "--title", `DownloadManager v${next}`, "--notes-file", "-"],
-  { cwd: root, input: notes, encoding: "utf8", shell: process.platform === "win32" },
-);
+// No shell: arguments (the title has a space) must reach gh unsplit.
+// GitHub can take a few seconds to see the freshly pushed tag, so retry.
+let draft;
+for (let attempt = 1; attempt <= 10; attempt++) {
+  draft = spawnSync(
+    "gh",
+    ["release", "create", `v${next}`, "--draft", "--verify-tag", "--title", `DownloadManager v${next}`, "--notes-file", "-"],
+    { cwd: root, input: notes, encoding: "utf8" },
+  );
+  if (draft.status === 0 || draft.error || !/no matches found|not found/i.test(draft.stderr)) break;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
+}
 if (draft.status !== 0) {
   console.warn(
     `! could not create the draft release (${(draft.stderr || "gh not found").trim()}).\n` +
