@@ -90,7 +90,8 @@ Bản cập nhật được ký bằng minisign và app chỉ cài bản có ch�
    - kiểm tra đang ở `main` và không còn thay đổi chưa commit;
    - nâng version ở `Cargo.toml`, `package.json`, `tauri.conf.json`, `extension/manifest.json`;
    - chuyển `[Unreleased]` thành `[0.4.0]`;
-   - commit, tạo tag `v0.4.0` và push.
+   - commit, tạo tag `v0.4.0` và push;
+   - tạo release nháp bằng tài khoản `gh` của bạn. Cần `gh auth login`, vì GitHub không cho token của CI tự tạo release ở repo này.
 3. CI tự làm phần còn lại:
    - build Windows/macOS/Linux, ký các bản cập nhật;
    - đính kèm bộ cài, extension và `latest.json`;

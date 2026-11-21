@@ -79,4 +79,23 @@ git("add", "package.json", "src-tauri/tauri.conf.json", "extension/manifest.json
 git("commit", "-m", `release: v${next}`);
 git("tag", "-a", `v${next}`, "-m", `DownloadManager v${next}`);
 git("push", "origin", "main", `v${next}`);
+
+// GitHub refuses to let the workflow token *create* releases in this repo
+// (it may still upload to and edit an existing one), so create the draft here
+// with the user's gh login. CI needs minutes before it uploads anything.
+const notes = execFileSync(process.execPath, [join(root, "scripts", "release-notes.mjs"), next, "--changes-only"], {
+  cwd: root,
+  encoding: "utf8",
+});
+const draft = spawnSync(
+  "gh",
+  ["release", "create", `v${next}`, "--draft", "--verify-tag", "--title", `DownloadManager v${next}`, "--notes-file", "-"],
+  { cwd: root, input: notes, encoding: "utf8", shell: process.platform === "win32" },
+);
+if (draft.status !== 0) {
+  console.warn(
+    `! could not create the draft release (${(draft.stderr || "gh not found").trim()}).\n` +
+      `  Create it before CI finishes building:  gh release create v${next} --draft --verify-tag`,
+  );
+}
 console.log(`\n✔ Pushed v${next}. CI is building and will publish the release:\n  ${repo}/actions`);
