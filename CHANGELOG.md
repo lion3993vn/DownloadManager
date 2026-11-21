@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-21
+
 ### 🐛 Sửa lỗi
 - **App không nhận ra extension đã cài trên Chrome/Edge/Cốc Cốc**: extension đã ghép cặp thành công nhưng trình hướng dẫn vẫn báo "Chưa cài". Nguyên nhân là trình duyệt nhân Chromium không gửi header `Origin` cho request GET từ extension. Nay extension gửi kèm định danh của mình (`X-DM-Extension`) và app ghi nhận kết nối ngay.
 
@@ -59,7 +61,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.3.1
 [0.3.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.3.0
 [0.2.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.2.0
 [0.1.0]: https://github.com/lion3993vn/DownloadManager/commits/v0.2.0
