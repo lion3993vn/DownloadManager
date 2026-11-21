@@ -136,7 +136,7 @@ fn launch(exe: &Path, args: &[String]) -> std::io::Result<()> {
 fn user_data_dir(id: &str) -> Option<PathBuf> {
     #[cfg(windows)]
     let (base, rel) = (
-        std::env::var_os("LOCALAPPDATA")?,
+        PathBuf::from(std::env::var_os("LOCALAPPDATA")?),
         match id {
             "chrome" => r"Google\Chrome\User Data",
             "edge" => r"Microsoft\Edge\User Data",
@@ -170,7 +170,7 @@ fn user_data_dir(id: &str) -> Option<PathBuf> {
             _ => return None,
         },
     );
-    Some(PathBuf::from(base).join(rel))
+    Some(base.join(rel))
 }
 
 /// `profile.last_used` from the browser's `Local State` file.
