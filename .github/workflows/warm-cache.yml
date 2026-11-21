@@ -1,0 +1,69 @@
+name: warm-cache
+
+# Release builds run on tags, and tags can only restore caches created on the
+# default branch. This workflow compiles the release build on main (without
+# bundling) so `pnpm release` finds every dependency already built.
+on:
+  push:
+    branches: [main]
+    paths:
+      - Cargo.lock
+      - "**/Cargo.toml"
+      - src-tauri/tauri.conf.json
+      - .github/workflows/**
+  # GitHub evicts caches unused for 7 days.
+  schedule:
+    - cron: "0 3 * * 1,4"
+  workflow_dispatch:
+
+concurrency:
+  group: warm-cache
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Must match the bundle matrix in build.yml (same shared-key names).
+        include:
+          - name: windows-x64
+            platform: windows-latest
+            args: ""
+            rust-target: ""
+          - name: macos-arm64
+            platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            rust-target: aarch64-apple-darwin
+          - name: macos-x64
+            platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            rust-target: x86_64-apple-darwin
+          - name: linux-x64
+            platform: ubuntu-22.04
+            args: ""
+            rust-target: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.name }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Same cargo invocation as a release (features, profile, target), no installers.
+      - run: pnpm tauri build --no-bundle ${{ matrix.args }}

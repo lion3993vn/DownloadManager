@@ -20,6 +20,6 @@ axum = "0.8"
 bytes = "1"
 
 [profile.release]
-lto = true
-codegen-units = 1
+# Thin LTO + default codegen units: much faster CI builds for a few % size.
+lto = "thin"
 strip = true

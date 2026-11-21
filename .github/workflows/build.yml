@@ -5,6 +5,13 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  # Build installers on demand without releasing (Actions → build → Run workflow).
+  workflow_dispatch:
+
+# A newer push to the same branch makes older runs pointless; never cancel releases.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   test:
@@ -15,22 +22,63 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -p dm-core -p dm-cli
 
+  # Pushes and PRs: fast compile/lint check of the whole app instead of
+  # building installers for every platform.
+  check:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: check
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
   bundle:
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: test
-    # Needed to create the GitHub release and upload installers on tags
-    # (new repositories give GITHUB_TOKEN read-only access by default).
+    # Upload installers to the draft release. (The token cannot *create*
+    # releases in this repo; `pnpm release` creates the draft beforehand.)
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-latest
+          - name: windows-x64
+            platform: windows-latest
             args: ""
-          - platform: macos-latest
-            args: "--target universal-apple-darwin"
-          - platform: ubuntu-22.04
+            rust-target: ""
+          # Two parallel macOS jobs instead of one universal build that
+          # compiles everything twice in a row.
+          - name: macos-arm64
+            platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            rust-target: aarch64-apple-darwin
+          - name: macos-x64
+            platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            rust-target: x86_64-apple-darwin
+          - name: linux-x64
+            platform: ubuntu-22.04
             args: ""
+            rust-target: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -41,8 +89,13 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust-target }}
+      # Dependencies come pre-built from warm-cache.yml (tags can only read
+      # caches made on main), so a release mostly compiles our own crates.
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.name }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -55,7 +108,7 @@ jobs:
       # latest.json (shown by the in-app updater).
       - name: Release notes from CHANGELOG.md
         id: notes
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref_type == 'tag'
         shell: bash
         run: |
           {
@@ -71,14 +124,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
           args: ${{ matrix.args }}
-          # Draft release with installers when a v* tag is pushed.
-          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: DownloadManager ${{ github.ref_name }}
           releaseDraft: true
           releaseBody: ${{ steps.notes.outputs.body }}
       - uses: actions/upload-artifact@v4
         with:
-          name: bundle-${{ matrix.platform }}
+          name: bundle-${{ matrix.name }}
           path: target/**/release/bundle/**
 
   extension:
@@ -97,7 +149,7 @@ jobs:
   # After every platform is built: attach the extension, write the full
   # release description (changelog + download table + SHA-256) and publish.
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag'
     needs: [bundle, extension]
     runs-on: ubuntu-latest
     permissions:
@@ -120,4 +172,7 @@ jobs:
       - name: Write release notes and publish
         run: |
           node scripts/release-notes.mjs "$GITHUB_REF_NAME" --assets assets > notes.md
-          gh release edit "$GITHUB_REF_NAME"             --title "DownloadManager $GITHUB_REF_NAME"             --notes-file notes.md             --draft=false --latest
+          gh release edit "$GITHUB_REF_NAME" \
+            --title "DownloadManager $GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            --draft=false --latest

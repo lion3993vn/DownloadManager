@@ -6,6 +6,10 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### 🔧 Cải tiến
+- macOS có 2 bộ cài riêng: **Apple Silicon** (`_aarch64.dmg`) và **Intel** (`_x64.dmg`), nhỏ hơn bản universal trước đây. App tự cập nhật vẫn tải đúng bản cho từng máy.
+- Phát hành nhanh hơn: build song song, tối ưu thời gian biên dịch, cache thư viện được làm nóng sẵn.
+
 ## [0.3.1] - 2026-11-21
 
 ### 🐛 Sửa lỗi
