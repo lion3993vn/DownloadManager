@@ -83,6 +83,22 @@ Bản cập nhật được ký bằng minisign và app chỉ cài bản có ch�
 - **Local**: `TAURI_SIGNING_PRIVATE_KEY=<đường dẫn hoặc nội dung key> TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build`.
 - **Đừng làm mất private key.** Mất key thì các bản đã cài không nhận được cập nhật nữa.
 
+## Phát hành phiên bản mới
+
+1. Trong lúc làm, ghi thay đổi vào mục `## [Unreleased]` của [CHANGELOG.md](CHANGELOG.md) (nhóm `### ✨ Tính năng mới` / `### 🔧 Cải tiến` / `### 🐛 Sửa lỗi`).
+2. Chạy `pnpm release 0.4.0` (thêm `--dry-run` để xem trước). Script sẽ:
+   - kiểm tra đang ở `main` và không còn thay đổi chưa commit;
+   - nâng version ở `Cargo.toml`, `package.json`, `tauri.conf.json`, `extension/manifest.json`;
+   - chuyển `[Unreleased]` thành `[0.4.0]`;
+   - commit, tạo tag `v0.4.0` và push.
+3. CI tự làm phần còn lại:
+   - build Windows/macOS/Linux, ký các bản cập nhật;
+   - đính kèm bộ cài, extension và `latest.json`;
+   - ghép mô tả release từ changelog + [mẫu](.github/release-template.md) (bảng tải về, lưu ý, SHA-256);
+   - **publish**.
+
+   Các app đang chạy sẽ thấy bản mới trong vòng 6 giờ, hoặc ngay khi khởi động lại.
+
 ## Giới hạn hiện tại
 
 - Chưa bắt video stream (HLS/DASH m3u8), chưa hỗ trợ FTP/BitTorrent.

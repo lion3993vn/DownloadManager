@@ -1,0 +1,82 @@
+// One-command release:  pnpm release 0.4.0   (add --dry-run to preview)
+//
+// 1. Checks: on main, no uncommitted changes to tracked files, version is
+//    newer than the current one, CHANGELOG.md has entries under [Unreleased].
+// 2. Bumps the version in Cargo.toml, package.json, tauri.conf.json and the
+//    extension manifest (+ Cargo.lock), turns [Unreleased] into [x.y.z].
+// 3. Commits "release: vx.y.z", creates tag vx.y.z, pushes both.
+// CI (.github/workflows/build.yml) then builds every platform, attaches the
+// installers + extension, writes the release notes and publishes.
+import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = join(import.meta.dirname, "..");
+const args = process.argv.slice(2);
+const dry = args.includes("--dry-run");
+const next = (args.find((a) => !a.startsWith("--")) || "").replace(/^v/, "");
+
+const die = (msg) => {
+  console.error(`✖ ${msg}`);
+  process.exit(1);
+};
+const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8" }).trim();
+const read = (p) => readFileSync(join(root, p), "utf8");
+const write = (p, s) => (dry ? console.log(`  (dry-run) would write ${p}`) : writeFileSync(join(root, p), s));
+
+if (!/^\d+\.\d+\.\d+$/.test(next)) die("usage: pnpm release <x.y.z> [--dry-run]");
+
+const current = JSON.parse(read("src-tauri/tauri.conf.json")).version;
+const newer = (a, b) => {
+  const [x, y] = [a, b].map((v) => v.split(".").map(Number));
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+};
+if (!newer(next, current)) die(`version ${next} must be newer than the current ${current}`);
+if (git("rev-parse", "--abbrev-ref", "HEAD") !== "main") die("releases are made from the main branch");
+if (git("status", "--porcelain", "--untracked-files=no")) {
+  if (dry) console.warn("! uncommitted changes (ignored in dry run)");
+  else die("commit or stash your changes first");
+}
+if (git("tag", "-l", `v${next}`)) die(`tag v${next} already exists`);
+
+// CHANGELOG: [Unreleased] must have content; it becomes the release notes.
+const changelog = read("CHANGELOG.md");
+const m = changelog.match(/^## \[Unreleased\][^\n]*\n([\s\S]*?)(?=^## \[|^\[[^\]]+\]:\s)/m);
+if (!m || !m[1].trim()) die("CHANGELOG.md: write the changes under ## [Unreleased] first");
+const today = new Date().toISOString().slice(0, 10);
+const repo = "https://github.com/lion3993vn/DownloadManager";
+let newChangelog = changelog.replace(/^## \[Unreleased\][^\n]*\n/m, `## [Unreleased]\n\n## [${next}] - ${today}\n`);
+newChangelog = newChangelog.replace(
+  /^\[Unreleased\]: .*$/m,
+  `[Unreleased]: ${repo}/compare/v${next}...HEAD\n[${next}]: ${repo}/releases/tag/v${next}`,
+);
+
+console.log(`Releasing v${current} → v${next}${dry ? " (dry run)" : ""}`);
+console.log("\nRelease notes:\n" + m[1].trim().replace(/^/gm, "  ") + "\n");
+
+// Version bumps.
+const bumpJson = (p) => write(p, read(p).replace(/("version":\s*")[^"]+(")/, `$1${next}$2`));
+bumpJson("package.json");
+bumpJson("src-tauri/tauri.conf.json");
+bumpJson("extension/manifest.json");
+write(
+  "Cargo.toml",
+  read("Cargo.toml").replace(/(\[workspace\.package\][\s\S]*?\nversion = ")[^"]+(")/, `$1${next}$2`),
+);
+write("CHANGELOG.md", newChangelog);
+
+if (dry) {
+  console.log("\n(dry-run) would update Cargo.lock, commit, tag and push.");
+  process.exit(0);
+}
+
+// Keep Cargo.lock in sync with the new workspace version (best effort).
+const cargo = spawnSync("cargo", ["update", "--workspace", "--offline"], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+if (cargo.status !== 0) console.warn("! could not update Cargo.lock (cargo not found?), continuing");
+
+git("add", "package.json", "src-tauri/tauri.conf.json", "extension/manifest.json", "Cargo.toml", "Cargo.lock", "CHANGELOG.md");
+git("commit", "-m", `release: v${next}`);
+git("tag", "-a", `v${next}`, "-m", `DownloadManager v${next}`);
+git("push", "origin", "main", `v${next}`);
+console.log(`\n✔ Pushed v${next}. CI is building and will publish the release:\n  ${repo}/actions`);
