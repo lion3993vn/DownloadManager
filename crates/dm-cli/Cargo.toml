@@ -1,0 +1,14 @@
+[package]
+name = "dm-cli"
+description = "Command line front-end for dm-core (testing and benchmarking)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "dm-cli"
+path = "src/main.rs"
+
+[dependencies]
+dm-core = { path = "../dm-core" }
+tokio = { workspace = true, features = ["signal"] }

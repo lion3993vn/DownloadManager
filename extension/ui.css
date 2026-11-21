@@ -1,0 +1,143 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1e293b;
+  --muted: #64748b;
+  --border: #cbd5e1;
+  --accent: #2563eb;
+  --ok: #059669;
+  --warn: #d97706;
+  font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a;
+    --fg: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+  }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--accent);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+input,
+textarea {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+}
+label {
+  display: block;
+  margin: 10px 0;
+  color: var(--muted);
+}
+label input,
+label textarea {
+  margin-top: 4px;
+  color: var(--fg);
+}
+label.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+}
+label.row input {
+  width: auto;
+  margin: 0;
+}
+.status {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.status.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+.status.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Popup */
+body.popup {
+  width: 290px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.popup header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.popup label.row {
+  margin: 0;
+}
+.popup footer {
+  text-align: right;
+}
+.popup a {
+  color: var(--accent);
+}
+
+/* Options */
+body.options {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+.options h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+}
+.options h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 28px 0 8px;
+}
+.options .actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}

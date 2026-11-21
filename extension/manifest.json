@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "DownloadManager Connector",
+  "version": "0.1.0",
+  "description": "Chuyển các lượt tải từ trình duyệt sang DownloadManager để tải đa luồng, nhanh hơn.",
+  "permissions": ["downloads", "cookies", "contextMenus", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["common.js", "background.js"]
+  },
+  "action": {
+    "default_title": "DownloadManager",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon32.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon64.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon32.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon64.png",
+    "128": "icons/icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "connector@downloadmanager.local",
+      "strict_min_version": "128.0"
+    }
+  }
+}

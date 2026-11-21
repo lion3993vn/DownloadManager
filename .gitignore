@@ -1,0 +1,10 @@
+/target
+node_modules/
+/dist
+*.dmpart
+.DS_Store
+/extension/*.zip
+src-tauri/gen/schemas
+/dist-extension
+*.tsbuildinfo
+/extension/pairing.json

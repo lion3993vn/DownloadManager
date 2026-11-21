@@ -1,0 +1,191 @@
+//! Local HTTP endpoint the browser extension talks to.
+//!
+//! Bound to 127.0.0.1 only. Requests from web pages are rejected by the
+//! `Origin` check (browsers always send it cross-origin and pages cannot fake
+//! an extension origin); captures additionally require the pairing token.
+
+use crate::state::{AppState, Capture, PairRequest};
+use crate::window::show_main_window;
+use axum::extract::State;
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use dm_core::NewDownload;
+use serde::Deserialize;
+use serde_json::json;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager};
+use tower_http::cors::{AllowOrigin, CorsLayer};
+
+const TOKEN_HEADER: &str = "x-dm-token";
+
+pub fn start(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let port = state.app_settings().bridge_port;
+        let listener = match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::error!(port, error = %e, "browser bridge could not start");
+                *state.bridge.write().unwrap() = crate::state::BridgeStatus {
+                    running: false,
+                    port,
+                    error: Some(format!("Không mở được cổng {port}: {e}")),
+                };
+                return;
+            }
+        };
+        *state.bridge.write().unwrap() = crate::state::BridgeStatus {
+            running: true,
+            port,
+            error: None,
+        };
+        tracing::info!(port, "browser bridge listening");
+        if let Err(e) = axum::serve(listener, router(app.clone())).await {
+            tracing::error!(error = %e, "browser bridge stopped");
+            let mut b = state.bridge.write().unwrap();
+            b.running = false;
+            b.error = Some(e.to_string());
+        }
+    });
+}
+
+fn router(app: AppHandle) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin, _| {
+            is_extension_origin(origin)
+        }))
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([header::CONTENT_TYPE, HeaderName::from_static(TOKEN_HEADER)]);
+    Router::new()
+        .route("/api/ping", get(ping))
+        .route("/api/pair", post(pair))
+        .route("/api/capture", post(capture))
+        .layer(cors)
+        .with_state(app)
+}
+
+fn is_extension_origin(origin: &HeaderValue) -> bool {
+    origin.to_str().is_ok_and(|o| {
+        o.starts_with("chrome-extension://")
+            || o.starts_with("moz-extension://")
+            || o.starts_with("safari-web-extension://")
+    })
+}
+
+/// Requests without an Origin come from local tools (curl, scripts) and still
+/// need the token; requests with a non-extension Origin are web pages.
+fn origin_allowed(headers: &HeaderMap) -> bool {
+    headers.get(header::ORIGIN).is_none_or(is_extension_origin)
+}
+
+fn token_valid(app: &AppHandle, headers: &HeaderMap) -> bool {
+    let expected = app.state::<AppState>().app_settings().bridge_token;
+    let given = headers
+        .get(TOKEN_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    constant_time_eq(given.as_bytes(), expected.as_bytes())
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+fn error(status: StatusCode, msg: &str) -> Response {
+    (status, Json(json!({ "ok": false, "error": msg }))).into_response()
+}
+
+async fn ping(State(app): State<AppHandle>, headers: HeaderMap) -> Response {
+    if !origin_allowed(&headers) {
+        return error(StatusCode::FORBIDDEN, "origin not allowed");
+    }
+    Json(json!({
+        "app": "DownloadManager",
+        "version": env!("CARGO_PKG_VERSION"),
+        "paired": token_valid(&app, &headers),
+    }))
+    .into_response()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PairBody {
+    #[serde(default)]
+    browser: String,
+}
+
+/// The extension asks for the token; the user approves in the app.
+async fn pair(
+    State(app): State<AppHandle>,
+    headers: HeaderMap,
+    Json(body): Json<PairBody>,
+) -> Response {
+    let Some(origin) = headers
+        .get(header::ORIGIN)
+        .filter(|o| is_extension_origin(o))
+        .and_then(|o| o.to_str().ok())
+        .map(str::to_owned)
+    else {
+        return error(
+            StatusCode::FORBIDDEN,
+            "pairing is only available to browser extensions",
+        );
+    };
+    let state = app.state::<AppState>();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let request = PairRequest {
+        id: state.next_id(),
+        origin,
+        browser: body.browser,
+    };
+    let id = request.id;
+    state
+        .pair_requests
+        .lock()
+        .unwrap()
+        .insert(id, (request.clone(), tx));
+    let _ = app.emit("dm://pair-request", &request);
+    show_main_window(&app);
+
+    let approved = tokio::time::timeout(Duration::from_secs(120), rx).await;
+    state.pair_requests.lock().unwrap().remove(&id);
+    match approved {
+        Ok(Ok(true)) => {
+            Json(json!({ "ok": true, "token": state.app_settings().bridge_token })).into_response()
+        }
+        _ => error(StatusCode::FORBIDDEN, "pairing was declined"),
+    }
+}
+
+async fn capture(
+    State(app): State<AppHandle>,
+    headers: HeaderMap,
+    Json(mut c): Json<Capture>,
+) -> Response {
+    if !origin_allowed(&headers) {
+        return error(StatusCode::FORBIDDEN, "origin not allowed");
+    }
+    if !token_valid(&app, &headers) {
+        return error(StatusCode::UNAUTHORIZED, "invalid token");
+    }
+    if !(c.url.starts_with("http://") || c.url.starts_with("https://")) {
+        return error(StatusCode::BAD_REQUEST, "only http(s) URLs are supported");
+    }
+    let state = app.state::<AppState>();
+    if state.app_settings().confirm_captures {
+        c.id = state.next_id();
+        state.captures.lock().unwrap().push(c);
+        let _ = app.emit("dm://capture", ());
+        show_main_window(&app);
+    } else if let Err(e) = state.engine.add(NewDownload {
+        url: c.url,
+        file_name: c.file_name,
+        headers: c.headers,
+        ..Default::default()
+    }) {
+        return error(StatusCode::BAD_REQUEST, &e.to_string());
+    }
+    Json(json!({ "ok": true })).into_response()
+}

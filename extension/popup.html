@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="popup">
+    <header>
+      <img src="icons/icon32.png" alt="" width="20" height="20" />
+      <strong>DownloadManager</strong>
+    </header>
+
+    <div id="status" class="status">Đang kiểm tra…</div>
+
+    <button id="pair" class="primary" hidden>Kết nối với app</button>
+
+    <label class="row">
+      <input type="checkbox" id="enabled" />
+      <span>Tự bắt các lượt tải</span>
+    </label>
+
+    <button id="skip">Lần tải tới dùng trình duyệt</button>
+
+    <footer>
+      <a href="#" id="options">Tùy chọn</a>
+    </footer>
+    <script src="common.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>DownloadManager — Tùy chọn</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="options">
+    <h1><img src="icons/icon32.png" alt="" width="24" height="24" /> DownloadManager Connector</h1>
+
+    <section>
+      <h2>Kết nối</h2>
+      <p id="status" class="status">Đang kiểm tra…</p>
+      <label>
+        Mã ghép cặp
+        <input id="token" spellcheck="false" placeholder="Dán mã từ DownloadManager → Cài đặt → Trình duyệt" />
+      </label>
+      <label>
+        Cổng
+        <input id="port" type="number" min="1" max="65535" />
+      </label>
+      <button id="pair">Ghép cặp tự động</button>
+    </section>
+
+    <section>
+      <h2>Bắt lượt tải</h2>
+      <label class="row"><input type="checkbox" id="enabled" /> Tự chuyển lượt tải sang app</label>
+      <label>
+        Đuôi tệp cần bắt (cách nhau bởi dấu cách)
+        <textarea id="extensions" rows="4" spellcheck="false"></textarea>
+      </label>
+      <label>
+        Cũng bắt mọi tệp lớn hơn (MB, 0 = tắt)
+        <input id="minSizeMB" type="number" min="0" />
+      </label>
+      <p class="hint">
+        Mẹo: chuột phải vào liên kết → “Tải bằng DownloadManager”. Nếu app không chạy, trình duyệt sẽ tải như bình thường.
+      </p>
+    </section>
+
+    <div class="actions">
+      <button id="reset">Khôi phục mặc định</button>
+      <button id="save" class="primary">Lưu</button>
+      <span id="saved" class="hint"></span>
+    </div>
+
+    <script src="common.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
