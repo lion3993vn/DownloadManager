@@ -1,109 +1,77 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
-import { api, onCapture, onPairRequest, type BridgeStatus, type Capture, type PairRequest, type Settings, type Status } from "./lib/api";
-import { fileKind, formatSpeed, type FileKind } from "./lib/format";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  api,
+  onCapture,
+  onExtensionConnected,
+  onPairRequest,
+  type BridgeStatus,
+  type Capture,
+  type ConnectedExtension,
+  type PairRequest,
+  type Settings,
+  type Status,
+} from "./lib/api";
+import { fileKind, type FileKind } from "./lib/format";
+import { useTheme } from "./lib/theme";
 import { useDownloads, type Row } from "./lib/useDownloads";
 import { AddDialog } from "./components/AddDialog";
-import { SettingsDialog } from "./components/SettingsDialog";
-import { DownloadTable } from "./components/DownloadTable";
+import { ContextMenu, type MenuItem } from "./components/ContextMenu";
+import { DetailsPanel } from "./components/DetailsPanel";
+import { DownloadList, type RowActions } from "./components/DownloadList";
+import { ExtensionWizard } from "./components/ExtensionWizard";
 import { Modal } from "./components/Modal";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { Sidebar, STATUS_FILTERS, TYPE_FILTERS, type Filter, type StatusFilter } from "./components/Sidebar";
+import { StatsBar } from "./components/StatsBar";
+import { Toasts, useToasts } from "./components/Toasts";
 import {
-  AlertIcon,
-  AppIcon,
-  ArchiveIcon,
-  CheckIcon,
-  ClockIcon,
-  CloseIcon,
-  DocIcon,
+  CopyIcon,
   DownloadIcon,
   FolderIcon,
-  ListIcon,
-  MusicIcon,
+  LinkIcon,
   OpenIcon,
   PauseIcon,
   PlayIcon,
-  PlusIcon,
   PuzzleIcon,
+  RetryIcon,
   SearchIcon,
-  SettingsIcon,
   StopIcon,
   TrashIcon,
-  VideoIcon,
 } from "./components/Icons";
 
-type IconT = ComponentType<SVGProps<SVGSVGElement>>;
-type Filter =
-  | { kind: "status"; key: "all" | "active" | "unfinished" | "completed" }
-  | { kind: "type"; key: FileKind };
+const MATCH: Record<StatusFilter, (s: Status) => boolean> = {
+  all: () => true,
+  active: (s) => s === "downloading" || s === "queued",
+  unfinished: (s) => s === "paused" || s === "failed" || s === "canceled",
+  completed: (s) => s === "completed",
+};
 
-const STATUS_FILTERS: { key: "all" | "active" | "unfinished" | "completed"; label: string; icon: IconT; match: (s: Status) => boolean }[] = [
-  { key: "all", label: "Tất cả", icon: ListIcon, match: () => true },
-  { key: "active", label: "Đang tải", icon: DownloadIcon, match: (s) => s === "downloading" || s === "queued" },
-  { key: "unfinished", label: "Chưa xong", icon: ClockIcon, match: (s) => s === "paused" || s === "failed" || s === "canceled" },
-  { key: "completed", label: "Hoàn tất", icon: CheckIcon, match: (s) => s === "completed" },
-];
-
-const TYPE_FILTERS: { key: FileKind; label: string; icon: IconT }[] = [
-  { key: "video", label: "Video", icon: VideoIcon },
-  { key: "audio", label: "Âm nhạc", icon: MusicIcon },
-  { key: "archive", label: "Tệp nén", icon: ArchiveIcon },
-  { key: "document", label: "Tài liệu", icon: DocIcon },
-  { key: "program", label: "Chương trình", icon: AppIcon },
-];
-
-function ToolButton({ icon: Icon, label, onClick, disabled, primary }: { icon: IconT; label: string; onClick: () => void; disabled?: boolean; primary?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className={`flex flex-col items-center gap-0.5 rounded-md px-2.5 py-1.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-        primary ? "text-accent hover:bg-blue-50 dark:hover:bg-blue-950" : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-      }`}
-    >
-      <Icon className="h-5 w-5" />
-      {label}
-    </button>
-  );
-}
-
-function SideItem({ icon: Icon, label, count, active, onClick }: { icon: IconT; label: string; count?: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left ${
-        active ? "bg-blue-100 font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-200" : "text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800"
-      }`}
-    >
-      <Icon className="h-4 w-4 shrink-0 opacity-80" />
-      <span className="flex-1 truncate">{label}</span>
-      {count != null && count > 0 && <span className="text-xs tabular-nums text-slate-500">{count}</span>}
-    </button>
-  );
-}
+const ONBOARDED_KEY = "dm.onboarded";
 
 export default function App() {
   const { rows, loaded } = useDownloads();
+  const [theme, setTheme] = useTheme();
+  const { toasts, push, dismiss } = useToasts();
+
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>({ kind: "status", key: "all" });
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
+  const [extensions, setExtensions] = useState<ConnectedExtension[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [pairs, setPairs] = useState<PairRequest[]>([]);
   const [confirmRemove, setConfirmRemove] = useState<Row | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ row: Row; x: number; y: number } | null>(null);
+  const [history, setHistory] = useState<number[]>(() => Array(60).fill(0));
 
-  const showError = useCallback((msg: string) => setToast(msg), []);
+  const showError = useCallback((msg: string) => push({ kind: "error", title: "Có lỗi xảy ra", body: msg }), [push]);
+  const run = useCallback((p: Promise<unknown>) => p.catch((e) => showError(String(e))), [showError]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  // Settings, bridge status, and anything the browser sent before the UI was ready.
+  // Initial data + backend events.
   useEffect(() => {
     api.getSettings().then(setSettings);
     const refreshBridge = () => api.bridgeStatus().then(setBridge);
@@ -113,147 +81,220 @@ export default function App() {
     const pullCaptures = () => api.takeCaptures().then((c) => c.length && setCaptures((old) => [...old, ...c]));
     pullCaptures();
     api.pendingPairRequests().then(setPairs);
-    const u1 = onCapture(pullCaptures);
-    const u2 = onPairRequest((r) => setPairs((old) => (old.some((p) => p.id === r.id) ? old : [...old, r])));
+    api.connectedExtensions().then((list) => {
+      setExtensions(list);
+      let onboarded = false;
+      try {
+        onboarded = localStorage.getItem(ONBOARDED_KEY) === "1";
+        localStorage.setItem(ONBOARDED_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+      if (!onboarded && list.length === 0) setShowWizard(true);
+    });
+
+    const subs = [
+      onCapture(pullCaptures),
+      onPairRequest((r) => setPairs((old) => (old.some((p) => p.id === r.id) ? old : [...old, r]))),
+      onExtensionConnected((e) => {
+        setExtensions((old) => [...old.filter((x) => x.origin !== e.origin), e]);
+        push({ kind: "success", title: `Đã kết nối ${e.browser}`, body: "Lượt tải từ trình duyệt sẽ tự chuyển sang app." });
+      }),
+    ];
     return () => {
       clearInterval(t);
-      u1.then((f) => f());
-      u2.then((f) => f());
+      subs.forEach((u) => u.then((f) => f()));
     };
-  }, []);
+  }, [push]);
 
   const all = useMemo(() => [...rows.values()].sort((a, b) => b.id - a.id), [rows]);
+  const totalSpeed = all.reduce((sum, r) => sum + (r.status === "downloading" ? r.speed : 0), 0);
+
+  // Speed history for the sparkline (1 sample / second).
+  const speedRef = useRef(0);
+  speedRef.current = totalSpeed;
+  useEffect(() => {
+    const t = setInterval(() => setHistory((h) => [...h.slice(1), speedRef.current]), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Notify when downloads finish or fail.
+  const prevStatus = useRef(new Map<number, Status>());
+  useEffect(() => {
+    const prev = prevStatus.current;
+    for (const r of all) {
+      const before = prev.get(r.id);
+      if (before && before !== r.status) {
+        if (r.status === "completed") {
+          push({ kind: "success", title: "Tải xong", body: r.fileName, action: { label: "Mở tệp", run: () => run(api.openFile(r.id)) } });
+        } else if (r.status === "failed") {
+          push({ kind: "error", title: `Lỗi: ${r.fileName}`, body: r.error ?? undefined });
+        }
+      }
+      prev.set(r.id, r.status);
+    }
+  }, [all, push, run]);
+
+  const statusCounts = useMemo(() => {
+    const c = { all: 0, active: 0, unfinished: 0, completed: 0 } as Record<StatusFilter, number>;
+    for (const r of all) for (const f of STATUS_FILTERS) if (MATCH[f.key](r.status)) c[f.key]++;
+    return c;
+  }, [all]);
+
+  const typeCounts = useMemo(() => {
+    const c: Partial<Record<FileKind, number>> = {};
+    for (const r of all) {
+      const k = fileKind(r.fileName);
+      c[k] = (c[k] ?? 0) + 1;
+    }
+    return c;
+  }, [all]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return all.filter((r) => {
-      if (filter.kind === "status" && !STATUS_FILTERS.find((f) => f.key === filter.key)!.match(r.status)) return false;
+      if (filter.kind === "status" && !MATCH[filter.key](r.status)) return false;
       if (filter.kind === "type" && fileKind(r.fileName) !== filter.key) return false;
       return !q || r.fileName.toLowerCase().includes(q) || r.url.toLowerCase().includes(q);
     });
   }, [all, filter, query]);
 
   const sel = selected != null ? (rows.get(selected) ?? null) : null;
-  const totalSpeed = all.reduce((sum, r) => sum + (r.status === "downloading" ? r.speed : 0), 0);
-  const activeCount = all.filter((r) => r.status === "downloading").length;
 
-  const run = (p: Promise<unknown>) => p.catch((e) => showError(String(e)));
+  const actions: RowActions = {
+    pause: (r) => run(api.pause(r.id)),
+    resume: (r) => run(api.resume(r.id)),
+    open: (r) => run(api.openFile(r.id)),
+    folder: (r) => run(api.showInFolder(r.id)),
+    menu: (r, x, y) => setMenu({ row: r, x, y }),
+  };
+
+  function menuItems(r: Row): MenuItem[] {
+    const items: MenuItem[] = [];
+    if (r.status === "completed") items.push({ label: "Mở tệp", icon: <OpenIcon />, onClick: () => actions.open(r) });
+    if (r.status === "downloading" || r.status === "queued") items.push({ label: "Tạm dừng", icon: <PauseIcon />, onClick: () => actions.pause(r) });
+    if (r.status === "paused") items.push({ label: "Tiếp tục", icon: <PlayIcon />, onClick: () => actions.resume(r) });
+    if (r.status === "failed" || r.status === "canceled") items.push({ label: "Tải lại", icon: <RetryIcon />, onClick: () => actions.resume(r) });
+    items.push({ label: "Mở thư mục", icon: <FolderIcon />, onClick: () => actions.folder(r) });
+    items.push({ label: "Chép liên kết", icon: <CopyIcon />, onClick: () => navigator.clipboard.writeText(r.url) });
+    if (r.status !== "completed" && r.status !== "canceled")
+      items.push({ label: "Hủy tải", icon: <StopIcon />, onClick: () => run(api.cancel(r.id)), separatorBefore: true });
+    items.push({ label: "Xóa…", icon: <TrashIcon />, danger: true, onClick: () => setConfirmRemove(r), separatorBefore: r.status === "completed" || r.status === "canceled" });
+    return items;
+  }
 
   // Keyboard shortcuts.
+  const modalOpen = showAdd || showSettings || showWizard || captures.length > 0 || pairs.length > 0 || confirmRemove != null;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || showAdd || showSettings) return;
+      if (modalOpen) return;
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
         e.preventDefault();
         setShowAdd(true);
-      } else if (e.key === "Delete" && sel) {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        document.getElementById("search")?.focus();
+      } else if (!typing && e.key === "Delete" && sel) {
         setConfirmRemove(sel);
+      } else if (!typing && e.key === " " && sel) {
+        e.preventDefault();
+        if (sel.status === "downloading" || sel.status === "queued") actions.pause(sel);
+        else if (sel.status !== "completed") actions.resume(sel);
+      } else if (e.key === "Escape" && !typing) {
+        setSelected(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sel, showAdd, showSettings]);
+  });
 
-  const canResume = sel && ["paused", "failed", "canceled"].includes(sel.status);
-  const canPause = sel && ["downloading", "queued"].includes(sel.status);
-  const canStop = sel && !["completed", "canceled"].includes(sel.status);
-
+  const title = filter.kind === "status" ? STATUS_FILTERS.find((f) => f.key === filter.key)!.label : TYPE_FILTERS.find((f) => f.key === filter.key)!.label;
+  const hasActive = all.some((r) => r.status === "downloading" || r.status === "queued");
+  const hasPaused = all.some((r) => r.status === "paused");
   const capture = captures[0];
   const pair = pairs[0];
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Toolbar */}
-      <header className="flex items-center gap-1 border-b border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-        <ToolButton icon={PlusIcon} label="Thêm URL" onClick={() => setShowAdd(true)} primary />
-        <div className="mx-1 h-8 w-px bg-slate-200 dark:bg-slate-700" />
-        <ToolButton icon={PlayIcon} label="Tiếp tục" disabled={!canResume} onClick={() => sel && run(api.resume(sel.id))} />
-        <ToolButton icon={PauseIcon} label="Tạm dừng" disabled={!canPause} onClick={() => sel && run(api.pause(sel.id))} />
-        <ToolButton icon={StopIcon} label="Hủy tải" disabled={!canStop} onClick={() => sel && run(api.cancel(sel.id))} />
-        <ToolButton icon={TrashIcon} label="Xóa" disabled={!sel} onClick={() => sel && setConfirmRemove(sel)} />
-        <div className="mx-1 h-8 w-px bg-slate-200 dark:bg-slate-700" />
-        <ToolButton icon={OpenIcon} label="Mở tệp" disabled={sel?.status !== "completed"} onClick={() => sel && run(api.openFile(sel.id))} />
-        <ToolButton icon={FolderIcon} label="Thư mục" disabled={!sel} onClick={() => sel && run(api.showInFolder(sel.id))} />
-        <div className="mx-1 h-8 w-px bg-slate-200 dark:bg-slate-700" />
-        <ToolButton icon={PlayIcon} label="Chạy hết" onClick={() => run(api.resumeAll())} />
-        <ToolButton icon={PauseIcon} label="Dừng hết" onClick={() => run(api.pauseAll())} />
-        <div className="flex-1" />
-        <div className="relative mr-1">
-          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="field w-52 pl-8" placeholder="Tìm kiếm…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
-        <ToolButton icon={SettingsIcon} label="Cài đặt" onClick={() => setShowSettings(true)} />
-      </header>
+    <div className="flex h-full">
+      <Sidebar
+        filter={filter}
+        onFilter={(f) => {
+          setFilter(f);
+          setSelected(null);
+        }}
+        statusCounts={statusCounts}
+        typeCounts={typeCounts}
+        extensions={extensions}
+        bridgeRunning={bridge?.running ?? false}
+        onAdd={() => setShowAdd(true)}
+        onSettings={() => setShowSettings(true)}
+        onInstallExtension={() => setShowWizard(true)}
+      />
 
-      <div className="flex min-h-0 flex-1">
-        {/* Sidebar */}
-        <nav className="w-48 shrink-0 space-y-4 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="space-y-0.5">
-            {STATUS_FILTERS.map((f) => (
-              <SideItem
-                key={f.key}
-                icon={f.icon}
-                label={f.label}
-                count={all.filter((r) => f.match(r.status)).length}
-                active={filter.kind === "status" && filter.key === f.key}
-                onClick={() => setFilter({ kind: "status", key: f.key })}
-              />
-            ))}
+      <main className="@container flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-3 px-5 pt-5 pb-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[20px] font-semibold tracking-tight">{title}</h1>
+            <p className="text-[12px] text-mute">{visible.length} tệp</p>
           </div>
-          <div>
-            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Loại tệp</p>
-            <div className="space-y-0.5">
-              {TYPE_FILTERS.map((f) => (
-                <SideItem
-                  key={f.key}
-                  icon={f.icon}
-                  label={f.label}
-                  count={all.filter((r) => fileKind(r.fileName) === f.key).length}
-                  active={filter.kind === "type" && filter.key === f.key}
-                  onClick={() => setFilter({ kind: "type", key: f.key })}
-                />
-              ))}
-            </div>
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint" />
+            <input id="search" className="field w-44 rounded-full py-1.5 pl-9 @[820px]:w-64" placeholder="Tìm theo tên hoặc liên kết…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-        </nav>
+          <button className="btn-outline" disabled={!hasPaused} onClick={() => run(api.resumeAll())} title="Tiếp tục tất cả">
+            <PlayIcon /> <span className="hidden @[700px]:inline">Tiếp tục hết</span>
+          </button>
+          <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title="Tạm dừng tất cả">
+            <PauseIcon /> <span className="hidden @[700px]:inline">Dừng hết</span>
+          </button>
+        </header>
 
-        {/* List */}
-        <main className="min-w-0 flex-1 overflow-auto" onMouseDown={(e) => e.target === e.currentTarget && setSelected(null)}>
-          {loaded && (
-            <DownloadTable
-              rows={visible}
-              selected={selected}
-              onSelect={setSelected}
-              onActivate={(r) =>
-                r.status === "completed" ? run(api.openFile(r.id)) : ["paused", "failed", "canceled"].includes(r.status) ? run(api.resume(r.id)) : undefined
-              }
-              emptyHint={all.length === 0 ? "Chưa có tệp nào. Bấm “Thêm URL” (Ctrl+N) hoặc tải từ trình duyệt." : "Không có tệp nào khớp bộ lọc."}
+        <StatsBar
+          speed={totalSpeed}
+          history={history}
+          active={all.filter((r) => r.status === "downloading").length}
+          queued={all.filter((r) => r.status === "queued").length}
+          completed={statusCounts.completed}
+          totalBytes={all.reduce((s, r) => s + (r.status === "completed" ? (r.totalSize ?? r.downloaded) : 0), 0)}
+        />
+
+        <div className="min-h-0 flex-1 overflow-y-auto" onMouseDown={(e) => e.target === e.currentTarget && setSelected(null)}>
+          {loaded && visible.length > 0 && <DownloadList rows={visible} selected={selected} onSelect={setSelected} actions={actions} />}
+          {loaded && visible.length === 0 && (
+            <EmptyState
+              filtered={all.length > 0}
+              hasExtension={extensions.length > 0}
+              onAdd={() => setShowAdd(true)}
+              onExtension={() => setShowWizard(true)}
             />
           )}
-        </main>
-      </div>
+        </div>
+      </main>
 
-      {/* Status bar */}
-      <footer className="flex items-center gap-4 border-t border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/60">
-        <span className="flex items-center gap-1.5" title={bridge?.error ?? undefined}>
-          <PuzzleIcon />
-          {bridge?.running ? (
-            <span>Extension: sẵn sàng (cổng {bridge.port})</span>
-          ) : (
-            <span className="text-red-500">Extension: không hoạt động</span>
-          )}
-        </span>
-        <div className="flex-1" />
-        <span>{activeCount > 0 ? `Đang tải ${activeCount} tệp` : "Không có tệp đang tải"}</span>
-        <span className="w-24 text-right font-medium tabular-nums text-slate-700 dark:text-slate-300">{formatSpeed(totalSpeed)}</span>
-      </footer>
+      {sel && (
+        <DetailsPanel
+          key={sel.id}
+          row={sel}
+          onClose={() => setSelected(null)}
+          onPause={() => actions.pause(sel)}
+          onResume={() => actions.resume(sel)}
+          onCancel={() => run(api.cancel(sel.id))}
+          onRemove={() => setConfirmRemove(sel)}
+          onOpen={() => actions.open(sel)}
+          onFolder={() => actions.folder(sel)}
+        />
+      )}
 
-      {/* Dialogs */}
+      {/* Overlays */}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.row)} onClose={() => setMenu(null)} />}
+
       {settings && showAdd && (
         <AddDialog
           defaultDir={settings.engine.downloadDir}
           defaultConnections={settings.engine.connections}
           onClose={() => setShowAdd(false)}
+          onAdded={(name, started) => push({ kind: "info", title: started ? "Đã bắt đầu tải" : "Đã thêm vào danh sách", body: name })}
           onError={showError}
         />
       )}
@@ -264,46 +305,33 @@ export default function App() {
           defaultDir={settings.engine.downloadDir}
           defaultConnections={settings.engine.connections}
           onClose={() => setCaptures((c) => c.slice(1))}
+          onAdded={(name, started) => push({ kind: "info", title: started ? "Đã bắt đầu tải" : "Đã thêm vào danh sách", body: name })}
           onError={showError}
         />
       )}
-      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} onSaved={setSettings} onError={showError} />}
+      {showSettings && (
+        <SettingsDialog
+          theme={theme}
+          onTheme={setTheme}
+          onClose={() => setShowSettings(false)}
+          onSaved={(s) => {
+            setSettings(s);
+            push({ kind: "success", title: "Đã lưu cài đặt" });
+          }}
+          onError={showError}
+          onInstallExtension={() => setShowWizard(true)}
+          onTokenRegenerated={() => setExtensions([])}
+        />
+      )}
+      {showWizard && <ExtensionWizard connected={extensions} onClose={() => setShowWizard(false)} onError={showError} />}
       {pair && (
-        <Modal
-          title="Kết nối extension trình duyệt?"
-          onClose={() => {
-            api.answerPairRequest(pair.id, false);
+        <PairDialog
+          pair={pair}
+          onAnswer={(approve) => {
+            api.answerPairRequest(pair.id, approve);
             setPairs((p) => p.slice(1));
           }}
-          footer={
-            <>
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  api.answerPairRequest(pair.id, false);
-                  setPairs((p) => p.slice(1));
-                }}
-              >
-                Từ chối
-              </button>
-              <button
-                className="btn-primary"
-                onClick={() => {
-                  api.answerPairRequest(pair.id, true);
-                  setPairs((p) => p.slice(1));
-                }}
-              >
-                Cho phép
-              </button>
-            </>
-          }
-        >
-          <p>
-            Extension trên <b>{pair.browser || "trình duyệt"}</b> muốn chuyển các lượt tải sang DownloadManager.
-          </p>
-          <p className="mt-2 break-all font-mono text-xs text-slate-500">{pair.origin}</p>
-          <p className="mt-3 text-xs text-slate-500">Chỉ cho phép nếu bạn vừa bấm “Kết nối” trong extension.</p>
-        </Modal>
+        />
       )}
       {confirmRemove && (
         <RemoveDialog
@@ -316,33 +344,85 @@ export default function App() {
           }}
         />
       )}
-
-      {toast && (
-        <div className="fixed bottom-10 left-1/2 z-[60] flex max-w-lg -translate-x-1/2 items-start gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-white shadow-xl dark:bg-slate-700">
-          <AlertIcon className="mt-0.5 shrink-0 text-amber-400" />
-          <span className="break-words">{toast}</span>
-          <button className="ml-2 opacity-60 hover:opacity-100" onClick={() => setToast(null)} aria-label="Đóng">
-            <CloseIcon />
-          </button>
-        </div>
-      )}
+      <Toasts toasts={toasts} dismiss={dismiss} />
     </div>
+  );
+}
+
+function EmptyState({ filtered, hasExtension, onAdd, onExtension }: { filtered: boolean; hasExtension: boolean; onAdd: () => void; onExtension: () => void }) {
+  if (filtered) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center pb-16 text-center text-mute">
+        <SearchIcon className="h-8 w-8 text-faint" />
+        <p className="mt-3 text-[13px]">Không có tệp nào khớp bộ lọc.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-8 pb-16 text-center">
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-brand/20 blur-2xl" />
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-brand to-brand-2 text-white shadow-xl shadow-brand/30">
+          <DownloadIcon className="h-10 w-10" strokeWidth={2.2} />
+        </div>
+      </div>
+      <h2 className="mt-6 text-[18px] font-semibold tracking-tight">Chưa có lượt tải nào</h2>
+      <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-mute">
+        Dán một liên kết để tải nhanh hơn với nhiều kết nối song song, hoặc kết nối trình duyệt để tự động bắt mọi lượt tải.
+      </p>
+      <div className="mt-6 flex gap-2.5">
+        <button className="btn-primary px-4 py-2.5" onClick={onAdd}>
+          <LinkIcon /> Thêm liên kết
+        </button>
+        {!hasExtension && (
+          <button className="btn-outline px-4 py-2.5" onClick={onExtension}>
+            <PuzzleIcon /> Kết nối trình duyệt
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PairDialog({ pair, onAnswer }: { pair: PairRequest; onAnswer: (approve: boolean) => void }) {
+  return (
+    <Modal
+      title="Cho phép extension kết nối?"
+      subtitle={`Từ ${pair.browser || "trình duyệt"}`}
+      icon={<PuzzleIcon />}
+      width="max-w-md"
+      onClose={() => onAnswer(false)}
+      footer={
+        <>
+          <button className="btn-ghost" onClick={() => onAnswer(false)}>
+            Từ chối
+          </button>
+          <button className="btn-primary" onClick={() => onAnswer(true)}>
+            Cho phép
+          </button>
+        </>
+      }
+    >
+      <p className="text-[13px] text-ink-2">Extension này muốn chuyển các lượt tải của trình duyệt sang DownloadManager.</p>
+      <p className="mt-3 rounded-lg bg-panel px-3 py-2 font-mono text-[11px] break-all text-mute">{pair.origin}</p>
+      <p className="mt-3 text-[12px] text-mute">Chỉ cho phép nếu bạn vừa bấm “Kết nối” trong extension.</p>
+    </Modal>
   );
 }
 
 function RemoveDialog({ row, onClose, onConfirm }: { row: Row; onClose: () => void; onConfirm: (deleteFile: boolean) => void }) {
   const [deleteFile, setDeleteFile] = useState(false);
   const done = row.status === "completed";
-  let note: ReactNode = null;
-  if (!done) note = <p className="mt-2 text-xs text-slate-500">Phần đã tải dở sẽ bị xóa.</p>;
   return (
     <Modal
-      title="Xóa khỏi danh sách"
+      title="Xóa khỏi danh sách?"
+      icon={<TrashIcon />}
+      danger
       onClose={onClose}
       width="max-w-md"
       footer={
         <>
-          <button className="btn-secondary" onClick={onClose}>
+          <button className="btn-ghost" onClick={onClose}>
             Hủy
           </button>
           <button className="btn-danger" onClick={() => onConfirm(deleteFile)}>
@@ -351,14 +431,14 @@ function RemoveDialog({ row, onClose, onConfirm }: { row: Row; onClose: () => vo
         </>
       }
     >
-      <p className="break-all">
-        Xóa <b>{row.fileName}</b> khỏi danh sách?
+      <p className="text-[13px] break-all text-ink-2">
+        <b className="text-ink">{row.fileName}</b>
       </p>
-      {note}
+      {!done && <p className="mt-2 text-[12.5px] text-mute">Phần đã tải dở sẽ bị xóa khỏi ổ đĩa.</p>}
       {done && (
-        <label className="mt-3 flex items-center gap-2">
-          <input type="checkbox" className="h-4 w-4" checked={deleteFile} onChange={(e) => setDeleteFile(e.target.checked)} />
-          Xóa cả tệp trên ổ đĩa
+        <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-lg border border-line px-3 py-2.5 text-[13px]">
+          <input type="checkbox" className="h-4 w-4 accent-red-600" checked={deleteFile} onChange={(e) => setDeleteFile(e.target.checked)} />
+          Xóa luôn tệp trên ổ đĩa
         </label>
       )}
     </Modal>

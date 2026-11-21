@@ -105,6 +105,25 @@ export interface PairRequest {
   browser: string;
 }
 
+export interface BrowserInfo {
+  id: string;
+  name: string;
+  engine: "chromium" | "firefox";
+  extensionsUrl: string;
+}
+
+export interface ExtensionSetupInfo {
+  folder: string;
+  manifestPath: string;
+  browsers: BrowserInfo[];
+}
+
+export interface ConnectedExtension {
+  origin: string;
+  browser: string;
+  lastSeen: number;
+}
+
 export const api = {
   list: () => invoke<DownloadInfo[]>("list_downloads"),
   add: (request: NewDownload) => invoke<DownloadInfo>("add_download", { request }),
@@ -124,6 +143,10 @@ export const api = {
   takeCaptures: () => invoke<Capture[]>("take_captures"),
   pendingPairRequests: () => invoke<PairRequest[]>("pending_pair_requests"),
   answerPairRequest: (id: number, approve: boolean) => invoke<void>("answer_pair_request", { id, approve }),
+  extensionSetupInfo: () => invoke<ExtensionSetupInfo>("extension_setup_info"),
+  connectedExtensions: () => invoke<ConnectedExtension[]>("connected_extensions"),
+  openBrowserExtensions: (browserId: string) => invoke<void>("open_browser_extensions", { browserId }),
+  revealExtensionFolder: () => invoke<void>("reveal_extension_folder"),
 };
 
 export const onEngineEvent = (cb: (e: EngineEvent) => void): Promise<UnlistenFn> =>
@@ -133,3 +156,6 @@ export const onCapture = (cb: () => void): Promise<UnlistenFn> => listen("dm://c
 
 export const onPairRequest = (cb: (r: PairRequest) => void): Promise<UnlistenFn> =>
   listen<PairRequest>("dm://pair-request", (e) => cb(e.payload));
+
+export const onExtensionConnected = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
+  listen<ConnectedExtension>("dm://extension-connected", (e) => cb(e.payload));

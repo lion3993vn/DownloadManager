@@ -3,13 +3,19 @@ import { CloseIcon } from "./Icons";
 
 interface Props {
   title: ReactNode;
+  subtitle?: ReactNode;
+  icon?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   width?: string;
+  /** Remove body padding (for layouts that manage their own). */
+  flush?: boolean;
+  /** Destructive dialog: red icon tile. */
+  danger?: boolean;
 }
 
-export function Modal({ title, onClose, children, footer, width = "max-w-lg" }: Props) {
+export function Modal({ title, subtitle, icon, onClose, children, footer, width = "max-w-lg", flush, danger }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -18,27 +24,31 @@ export function Modal({ title, onClose, children, footer, width = "max-w-lg" }: 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[1px]"
+      className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-6 backdrop-blur-[2px]"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className={`flex max-h-full w-full ${width} flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-800`}
+        className={`animate-fade-up flex max-h-full w-full ${width} flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl shadow-black/20`}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-700">
-          <h2 className="text-[15px] font-semibold">{title}</h2>
-          <button
-            className="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-            onClick={onClose}
-            aria-label="Đóng"
-          >
+        <div className="flex items-start gap-3 px-6 pt-5 pb-4">
+          {icon && (
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${danger ? "bg-red-500/10 text-red-600" : "bg-brand/10 text-brand"}`}>
+              {icon}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] leading-6 font-semibold text-ink">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-[12.5px] text-mute">{subtitle}</p>}
+          </div>
+          <button className="icon-btn -mt-1 -mr-2" onClick={onClose} aria-label="Đóng">
             <CloseIcon />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className={`min-h-0 overflow-y-auto ${flush ? "" : "px-6 pb-5"}`}>{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-700 dark:bg-slate-800/60">
+          <div className="flex items-center justify-end gap-2 border-t border-line bg-panel/60 px-6 py-3.5">
             {footer}
           </div>
         )}
@@ -47,12 +57,32 @@ export function Modal({ title, onClose, children, footer, width = "max-w-lg" }: 
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-medium text-ink-2">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-[11.5px] leading-relaxed text-mute">{hint}</span>}
     </label>
+  );
+}
+
+export function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-[22px] w-10 shrink-0 items-center rounded-full transition-colors ${
+        checked ? "bg-brand" : "bg-line-strong"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-[21px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
   );
 }

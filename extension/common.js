@@ -31,16 +31,23 @@ function dmBrowserName() {
   const ua = navigator.userAgent;
   if (/Firefox\//.test(ua)) return "Firefox";
   if (/Edg\//.test(ua)) return "Microsoft Edge";
+  if (/coc_coc_browser\//i.test(ua)) return "Cốc Cốc";
   if (/OPR\//.test(ua)) return "Opera";
-  if (/Chrome\//.test(ua)) return "Chrome";
+  if (/Vivaldi\//.test(ua)) return "Vivaldi";
+  if (navigator.brave) return "Brave";
+  if (/Chrome\//.test(ua)) return "Google Chrome";
   return "Trình duyệt";
+}
+
+function dmHeaders(s, extra = {}) {
+  return { "X-DM-Token": s.token, "X-DM-Browser": dmBrowserName(), ...extra };
 }
 
 /** -> { running: bool, paired: bool } */
 async function dmPing(s) {
   try {
     const res = await fetch(`${dmBase(s)}/api/ping`, {
-      headers: { "X-DM-Token": s.token },
+      headers: dmHeaders(s),
       signal: AbortSignal.timeout(1500),
     });
     if (!res.ok) return { running: false, paired: false };
@@ -49,4 +56,33 @@ async function dmPing(s) {
   } catch {
     return { running: false, paired: false };
   }
+}
+
+/**
+ * When installed by the DownloadManager app, the extension folder contains a
+ * pairing.json with the current token. Returns null for store/zip installs.
+ */
+async function dmBundledPairing() {
+  try {
+    const res = await fetch(ext.runtime.getURL("pairing.json"), { cache: "no-store" });
+    if (!res.ok) return null;
+    const p = await res.json();
+    return typeof p.token === "string" && p.token ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Make sure we hold a working token, adopting the bundled one if needed. */
+async function dmEnsurePaired() {
+  let s = await dmSettings();
+  let status = await dmPing(s);
+  if (status.paired) return { ...status, settings: s };
+  const bundled = await dmBundledPairing();
+  if (bundled && (bundled.token !== s.token || (bundled.port && bundled.port !== s.port))) {
+    await ext.storage.local.set({ token: bundled.token, port: bundled.port || s.port });
+    s = await dmSettings();
+    status = await dmPing(s);
+  }
+  return { ...status, settings: s };
 }

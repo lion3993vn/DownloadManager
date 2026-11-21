@@ -50,16 +50,32 @@ cargo run --release -p dm-cli -- https://example.com/big.iso -c 8 -o ./out
 
 > Mẹo (Windows + OneDrive): đặt `CARGO_TARGET_DIR` ra ngoài thư mục đồng bộ để OneDrive không phải sync vài GB file build.
 
-## Cài extension
+## Cài đặt
 
-1. **Chrome / Edge**: mở `chrome://extensions` (hoặc `edge://extensions`) → bật *Developer mode* → *Load unpacked* → chọn thư mục `extension/`.
-2. **Firefox**: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on* → chọn `extension/manifest.json` (bản cố định cần ký qua AMO).
-3. Mở app, bấm biểu tượng extension → **Kết nối với app** → bấm **Cho phép** trong app. (Hoặc dán mã từ *Cài đặt → Trình duyệt* vào trang tùy chọn của extension.)
+Tải bộ cài từ GitHub Releases (hoặc tự build bằng `pnpm tauri build`):
 
-Extension bắt các tệp theo đuôi (zip, exe, iso, mp4, pdf, …) hoặc lớn hơn 20 MB (chỉnh trong tùy chọn). Chuột phải vào liên kết → *Tải bằng DownloadManager* để tải bất kỳ link nào.
+- **Windows**: `DownloadManager_x.y.z_x64-setup.exe` (khuyên dùng, giao diện tiếng Việt, cài cho người dùng hiện tại, không cần quyền admin) hoặc `.msi`.
+- **macOS**: `.dmg` · **Linux**: `.deb` / `.AppImage`.
+
+Bộ cài đã kèm sẵn extension trình duyệt.
+
+## Kết nối trình duyệt (cài extension ngay trong app)
+
+Mở app → **Kết nối trình duyệt** (thẻ ở góc dưới sidebar, hoặc tự mở ở lần chạy đầu). App sẽ:
+
+1. Giải nén extension ra thư mục cố định và **tự ghi mã ghép cặp vào extension** → không phải nhập mã.
+2. Phát hiện các trình duyệt có trên máy (Chrome, Edge, Cốc Cốc, Brave, Opera, Vivaldi, Firefox).
+3. Bấm **Mở <trình duyệt>**: mở cửa sổ mới ở profile dùng gần nhất và chép sẵn địa chỉ `chrome://extensions` → dán vào thanh địa chỉ.
+4. Bật *Developer mode* → *Load unpacked* → dán đường dẫn thư mục (nút **Chép** trong app).
+5. App tự nhận biết khi extension kết nối thành công.
+
+> Vì sao không cài tự động hoàn toàn? Chrome/Edge chặn phần mềm bên ngoài cài extension không có trên Store (và chặn mở `chrome://` từ dòng lệnh); Firefox bắt buộc extension được Mozilla ký. Muốn cài 1 chạm cần đăng extension lên Chrome Web Store / Edge Add-ons / AMO.
+
+Extension bắt các tệp theo đuôi (zip, exe, iso, mp4, pdf, …) hoặc lớn hơn 20 MB (chỉnh trong tùy chọn extension). Chuột phải vào liên kết → *Tải bằng DownloadManager* để tải bất kỳ link nào.
 
 ## Giới hạn hiện tại
 
 - Chưa bắt video stream (HLS/DASH m3u8), chưa hỗ trợ FTP/BitTorrent.
 - Không bắt download trong cửa sổ ẩn danh.
+- Firefox chỉ cài được extension dạng tạm thời (tự gỡ khi đóng Firefox) cho tới khi extension được Mozilla ký.
 - Tải theo kiểu một luồng (máy chủ không hỗ trợ Range) không tạm dừng/tiếp tục được — tiếp tục sẽ tải lại từ đầu.

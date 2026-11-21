@@ -4,7 +4,7 @@ async function refresh() {
   const s = await dmSettings();
   $("enabled").checked = s.enabled;
   $("skip").textContent = s.skipNext ? "Lần tải tới: dùng trình duyệt ✓" : "Lần tải tới dùng trình duyệt";
-  const { running, paired } = await dmPing(s);
+  const { running, paired } = await dmEnsurePaired();
   const status = $("status");
   if (!running) {
     status.textContent = "App chưa chạy — trình duyệt sẽ tự tải như bình thường.";

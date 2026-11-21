@@ -164,3 +164,84 @@ export const ImageIcon = (p: P) => (
     <path d="m21 16-5-5-9 9" />
   </Icon>
 );
+export const LinkIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+    <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+  </Icon>
+);
+export const SunIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+  </Icon>
+);
+export const MoonIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" />
+  </Icon>
+);
+export const MonitorIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M8 20h8M12 16v4" />
+  </Icon>
+);
+export const MoreIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+  </Icon>
+);
+export const InfoIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5M12 8h0" />
+  </Icon>
+);
+export const BoltIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M13 3 5 13h6l-1 8 8-10h-6z" />
+  </Icon>
+);
+export const LayersIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="m12 3 9 5-9 5-9-5z" />
+    <path d="m3 13 9 5 9-5" />
+  </Icon>
+);
+export const DiskIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="13" width="18" height="7" rx="2" />
+    <path d="M5 13 7.5 5h9L19 13M7 16.5h0" />
+  </Icon>
+);
+export const ChevronRightIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="m9 6 6 6-6 6" />
+  </Icon>
+);
+export const RetryIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5" />
+  </Icon>
+);
+export const CheckCircleIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8 12 3 3 5-6" />
+  </Icon>
+);
+export const GlobeIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </Icon>
+);
+export const ClipboardIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="6" y="4" width="12" height="17" rx="2" />
+    <path d="M9 4V3h6v1M9 10h6M9 14h4" />
+  </Icon>
+);

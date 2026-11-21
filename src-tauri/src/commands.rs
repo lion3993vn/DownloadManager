@@ -1,6 +1,9 @@
 //! Commands invoked from the React UI.
 
-use crate::state::{new_token, AppSettings, AppState, BridgeStatus, Capture, PairRequest};
+use crate::extension_setup::{self, ExtensionSetupInfo};
+use crate::state::{
+    new_token, AppSettings, AppState, BridgeStatus, Capture, ConnectedExtension, PairRequest,
+};
 use dm_core::{
     DownloadId, DownloadInfo, EngineSettings, NewDownload, ProbeResult, RequestHeaders, Status,
 };
@@ -126,11 +129,41 @@ pub fn save_settings(state: State<'_, AppState>, settings: SettingsDto) -> CmdRe
 }
 
 #[tauri::command]
-pub fn regenerate_token(state: State<'_, AppState>) -> String {
-    let mut app = state.settings.write().unwrap();
-    app.bridge_token = new_token();
-    app.save(&state.engine);
-    app.bridge_token.clone()
+pub fn regenerate_token(handle: AppHandle, state: State<'_, AppState>) -> String {
+    let token = {
+        let mut app = state.settings.write().unwrap();
+        app.bridge_token = new_token();
+        app.save(&state.engine);
+        app.bridge_token.clone()
+    };
+    // Old pairings become invalid; the bundled extension re-reads this file.
+    state.extensions.lock().unwrap().clear();
+    let _ = state.engine.set_kv("connected_extensions", "[]");
+    let _ = extension_setup::write_pairing(&handle);
+    token
+}
+
+#[tauri::command]
+pub fn extension_setup_info(app: AppHandle) -> CmdResult<ExtensionSetupInfo> {
+    extension_setup::info(&app)
+}
+
+#[tauri::command]
+pub fn connected_extensions(state: State<'_, AppState>) -> Vec<ConnectedExtension> {
+    state.extensions.lock().unwrap().clone()
+}
+
+#[tauri::command]
+pub fn open_browser_extensions(browser_id: String) -> CmdResult<()> {
+    extension_setup::open_extensions_page(&browser_id)
+}
+
+#[tauri::command]
+pub fn reveal_extension_folder(app: AppHandle) -> CmdResult<()> {
+    let info = extension_setup::info(&app)?;
+    app.opener()
+        .reveal_item_in_dir(info.manifest_path)
+        .map_err(err)
 }
 
 #[tauri::command]

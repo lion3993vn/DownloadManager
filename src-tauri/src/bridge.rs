@@ -19,6 +19,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 const TOKEN_HEADER: &str = "x-dm-token";
+const BROWSER_HEADER: &str = "x-dm-browser";
 
 pub fn start(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -57,7 +58,11 @@ fn router(app: AppHandle) -> Router {
             is_extension_origin(origin)
         }))
         .allow_methods([Method::GET, Method::POST])
-        .allow_headers([header::CONTENT_TYPE, HeaderName::from_static(TOKEN_HEADER)]);
+        .allow_headers([
+            header::CONTENT_TYPE,
+            HeaderName::from_static(TOKEN_HEADER),
+            HeaderName::from_static(BROWSER_HEADER),
+        ]);
     Router::new()
         .route("/api/ping", get(ping))
         .route("/api/pair", post(pair))
@@ -89,6 +94,24 @@ fn token_valid(app: &AppHandle, headers: &HeaderMap) -> bool {
     constant_time_eq(given.as_bytes(), expected.as_bytes())
 }
 
+/// Remember which browser extension is connected and tell the UI about new ones.
+fn note_extension(app: &AppHandle, headers: &HeaderMap) {
+    let Some(origin) = headers
+        .get(header::ORIGIN)
+        .filter(|o| is_extension_origin(o))
+        .and_then(|o| o.to_str().ok())
+    else {
+        return;
+    };
+    let browser = headers
+        .get(BROWSER_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if let Some(ext) = app.state::<AppState>().record_extension(origin, browser) {
+        let _ = app.emit("dm://extension-connected", &ext);
+    }
+}
+
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
@@ -101,10 +124,14 @@ async fn ping(State(app): State<AppHandle>, headers: HeaderMap) -> Response {
     if !origin_allowed(&headers) {
         return error(StatusCode::FORBIDDEN, "origin not allowed");
     }
+    let paired = token_valid(&app, &headers);
+    if paired {
+        note_extension(&app, &headers);
+    }
     Json(json!({
         "app": "DownloadManager",
         "version": env!("CARGO_PKG_VERSION"),
-        "paired": token_valid(&app, &headers),
+        "paired": paired,
     }))
     .into_response()
 }
@@ -170,6 +197,7 @@ async fn capture(
     if !token_valid(&app, &headers) {
         return error(StatusCode::UNAUTHORIZED, "invalid token");
     }
+    note_extension(&app, &headers);
     if !(c.url.starts_with("http://") || c.url.starts_with("https://")) {
         return error(StatusCode::BAD_REQUEST, "only http(s) URLs are supported");
     }

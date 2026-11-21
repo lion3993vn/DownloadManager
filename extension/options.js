@@ -12,7 +12,7 @@ async function load() {
 
 async function checkStatus() {
   const s = await dmSettings();
-  const { running, paired } = await dmPing(s);
+  const { running, paired } = await dmEnsurePaired();
   const el = $("status");
   if (!running) {
     el.textContent = "Không thấy app DownloadManager đang chạy trên máy.";

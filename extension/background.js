@@ -73,17 +73,33 @@ async function sendToApp(s, { url, fileName, fileSize, mime, referrer }) {
     userAgent: navigator.userAgent,
     cookies: await cookieHeader(url),
   };
-  try {
-    const res = await fetch(`${dmBase(s)}/api/capture`, {
+  const post = (settings) =>
+    fetch(`${dmBase(settings)}/api/capture`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-DM-Token": s.token },
+      headers: dmHeaders(settings, { "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(4000),
     });
+  try {
+    let res = await post(s);
+    if (res.status === 401) {
+      // Token changed in the app: adopt the one it wrote into pairing.json.
+      const r = await dmEnsurePaired();
+      if (!r.paired) return false;
+      res = await post(r.settings);
+    }
     return res.ok;
   } catch {
     return false;
   }
+}
+
+/** Settings with a usable token, or null if we are not paired. */
+async function pairedSettings() {
+  const s = await dmSettings();
+  if (s.token) return s;
+  const r = await dmEnsurePaired();
+  return r.paired ? r.settings : null;
 }
 
 async function flashBadge(text, color) {
@@ -97,16 +113,18 @@ async function flashBadge(text, color) {
 }
 
 ext.downloads.onCreated.addListener(async (item) => {
-  const s = await dmSettings();
-  if (!s.enabled || !s.token || item.incognito || item.state !== "in_progress") return;
+  const prefs = await dmSettings();
+  if (!prefs.enabled || item.incognito || item.state !== "in_progress") return;
   const url = item.finalUrl || item.url;
   if (!/^https?:\/\//i.test(url)) return; // blob:, data:, file:
-  if (s.skipNext) {
+  if (prefs.skipNext) {
     await ext.storage.local.set({ skipNext: false });
     return;
   }
   const name = baseName(item.filename) || nameFromUrl(url);
-  if (!shouldCapture(item, name, s)) return;
+  if (!shouldCapture(item, name, prefs)) return;
+  const s = await pairedSettings();
+  if (!s) return;
 
   // Hold the browser download while we ask the app.
   try {
@@ -147,15 +165,21 @@ function createMenu() {
     });
   });
 }
-ext.runtime.onInstalled.addListener(createMenu);
-ext.runtime.onStartup?.addListener(createMenu);
+// Pair with the app as soon as we are installed / the browser starts, so the
+// app's setup wizard can see the extension right away.
+function onBoot() {
+  createMenu();
+  dmEnsurePaired().catch(() => {});
+}
+ext.runtime.onInstalled.addListener(onBoot);
+ext.runtime.onStartup?.addListener(onBoot);
 
 ext.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
   const url = info.linkUrl || info.srcUrl;
   if (!url || !/^https?:\/\//i.test(url)) return;
-  const s = await dmSettings();
-  if (!s.token) {
+  const s = await pairedSettings();
+  if (!s) {
     ext.runtime.openOptionsPage();
     return;
   }

@@ -1,5 +1,6 @@
 mod bridge;
 mod commands;
+mod extension_setup;
 mod state;
 mod tray;
 mod window;
@@ -22,6 +23,10 @@ pub fn run() {
             let engine = tauri::async_runtime::block_on(async { Engine::open(&db_path) })?;
             forward_events(app.handle().clone(), engine.clone());
             app.manage(AppState::new(engine));
+            // Refresh the unpacked extension (new version + current pairing token).
+            if let Err(e) = extension_setup::prepare(app.handle()) {
+                tracing::warn!(error = %e, "could not prepare browser extension");
+            }
             bridge::start(app.handle().clone());
             tray::setup(app.handle())?;
             Ok(())
@@ -54,6 +59,10 @@ pub fn run() {
             commands::take_captures,
             commands::pending_pair_requests,
             commands::answer_pair_request,
+            commands::extension_setup_info,
+            commands::connected_extensions,
+            commands::open_browser_extensions,
+            commands::reveal_extension_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the application");
