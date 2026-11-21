@@ -298,6 +298,25 @@ impl Engine {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
+
+    /// Undo [`shutdown`](Self::shutdown) when the process keeps running after
+    /// all (e.g. an update failed to install): re-queue interrupted downloads.
+    pub fn restart_after_shutdown(&self) {
+        self.inner.shutting_down.store(false, Ordering::SeqCst);
+        {
+            let mut st = self.inner.state.lock().unwrap();
+            let State {
+                downloads, running, ..
+            } = &mut *st;
+            for d in downloads.values_mut() {
+                if d.status == Status::Downloading && !running.contains_key(&d.id) {
+                    d.status = Status::Queued;
+                    let _ = self.inner.store.save(d);
+                }
+            }
+        }
+        self.inner.schedule();
+    }
 }
 
 impl Inner {

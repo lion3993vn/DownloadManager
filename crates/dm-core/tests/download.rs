@@ -137,6 +137,22 @@ async fn resumes_after_restart() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn restart_after_shutdown_resumes_downloads() {
+    let server = start(6 * MB).await;
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::in_memory(settings(dir.path())).unwrap();
+    let mut events = engine.subscribe();
+    let id = add(&engine, server.url("slow"));
+    wait_progress(&mut events, id, MB as u64).await;
+
+    engine.shutdown().await;
+    assert!(!engine.is_running(id));
+    engine.restart_after_shutdown();
+    let d = wait_done(&engine, &mut events, id).await;
+    assert_eq!(std::fs::read(d.file_path()).unwrap(), server.data());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn remote_change_restarts_from_zero() {
     let server = start(6 * MB).await;
     let dir = tempfile::tempdir().unwrap();

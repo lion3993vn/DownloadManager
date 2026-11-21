@@ -14,6 +14,8 @@ import {
 import { fileKind, type FileKind } from "./lib/format";
 import { useTheme } from "./lib/theme";
 import { useDownloads, type Row } from "./lib/useDownloads";
+import { useUpdater } from "./lib/useUpdater";
+import { ChangelogDialog } from "./components/ChangelogDialog";
 import { AddDialog } from "./components/AddDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
@@ -67,6 +69,17 @@ export default function App() {
   const [confirmRemove, setConfirmRemove] = useState<Row | null>(null);
   const [menu, setMenu] = useState<{ row: Row; x: number; y: number } | null>(null);
   const [history, setHistory] = useState<number[]>(() => Array(60).fill(0));
+
+  const [showChangelog, setShowChangelog] = useState(false);
+  const updater = useUpdater((u) =>
+    push({
+      kind: "info",
+      title: `Có phiên bản mới v${u.version}`,
+      body: "Xem có gì mới và cập nhật chỉ với một nút bấm.",
+      action: { label: "Xem & cập nhật", run: () => setShowChangelog(true) },
+    }),
+  );
+  const availableUpdate = updater.state.kind === "available" ? updater.state.update : null;
 
   const showError = useCallback((msg: string) => push({ kind: "error", title: "Có lỗi xảy ra", body: msg }), [push]);
   const run = useCallback((p: Promise<unknown>) => p.catch((e) => showError(String(e))), [showError]);
@@ -184,7 +197,7 @@ export default function App() {
   }
 
   // Keyboard shortcuts.
-  const modalOpen = showAdd || showSettings || showWizard || captures.length > 0 || pairs.length > 0 || confirmRemove != null;
+  const modalOpen = showAdd || showSettings || showWizard || showChangelog || captures.length > 0 || pairs.length > 0 || confirmRemove != null;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (modalOpen) return;
@@ -230,6 +243,9 @@ export default function App() {
         onAdd={() => setShowAdd(true)}
         onSettings={() => setShowSettings(true)}
         onInstallExtension={() => setShowWizard(true)}
+        version={updater.version}
+        update={availableUpdate}
+        onChangelog={() => setShowChangelog(true)}
       />
 
       <main className="@container flex min-w-0 flex-1 flex-col">
@@ -321,8 +337,11 @@ export default function App() {
           onError={showError}
           onInstallExtension={() => setShowWizard(true)}
           onTokenRegenerated={() => setExtensions([])}
+          version={updater.version}
+          onChangelog={() => setShowChangelog(true)}
         />
       )}
+      {showChangelog && <ChangelogDialog updater={updater} onClose={() => setShowChangelog(false)} onError={showError} />}
       {showWizard && <ExtensionWizard connected={extensions} onClose={() => setShowWizard(false)} onError={showError} />}
       {pair && (
         <PairDialog

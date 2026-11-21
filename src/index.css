@@ -171,3 +171,119 @@ textarea {
   background-size: 24px 24px;
   animation: stripes 0.9s linear infinite;
 }
+
+/* Release notes (Markdown) */
+.md {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  user-select: text;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.1em 0 0.45em;
+}
+.md h1,
+.md h2 {
+  font-size: 15px;
+}
+.md h3 {
+  font-size: 13.5px;
+}
+.md h4 {
+  font-size: 13px;
+}
+.md p,
+.md ul,
+.md ol,
+.md table,
+.md pre,
+.md blockquote {
+  margin: 0.55em 0;
+}
+.md ul,
+.md ol {
+  padding-left: 1.35em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md li::marker {
+  color: var(--faint);
+}
+.md strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.md a {
+  color: var(--color-brand);
+  cursor: pointer;
+}
+.md a:hover {
+  text-decoration: underline;
+}
+.md code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.05em 0.35em;
+}
+.md pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.md pre code {
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 11px;
+}
+.md blockquote {
+  border-left: 3px solid var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+  border-radius: 0 8px 8px 0;
+  padding: 6px 12px;
+}
+.md blockquote p {
+  margin: 0;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1em 0;
+}
+.md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.md th,
+.md td {
+  border: 1px solid var(--line);
+  padding: 5px 9px;
+  text-align: left;
+}
+.md th {
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 600;
+}

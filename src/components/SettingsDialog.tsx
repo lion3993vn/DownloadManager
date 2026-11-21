@@ -13,6 +13,7 @@ import {
   PuzzleIcon,
   RefreshIcon,
   SettingsIcon,
+  SparklesIcon,
   SunIcon,
 } from "./Icons";
 
@@ -24,6 +25,8 @@ interface Props {
   onError: (msg: string) => void;
   onInstallExtension: () => void;
   onTokenRegenerated: () => void;
+  version: string;
+  onChangelog: () => void;
 }
 
 type Tab = "download" | "browser" | "app" | "about";
@@ -68,7 +71,7 @@ function Stepper({ value, min, max, onChange, suffix }: { value: number; min: nu
   );
 }
 
-export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onInstallExtension, onTokenRegenerated }: Props) {
+export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onInstallExtension, onTokenRegenerated, version, onChangelog }: Props) {
   const [tab, setTab] = useState<Tab>("download");
   const [s, setS] = useState<Settings | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
@@ -280,7 +283,16 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                 <DownloadIcon className="h-8 w-8" strokeWidth={2.4} />
               </div>
               <h3 className="mt-4 text-[17px] font-semibold">DownloadManager</h3>
-              <p className="text-[12px] text-mute">Phiên bản 0.2.0</p>
+              <p className="text-[12px] text-mute">Phiên bản {version || "…"}</p>
+              <button
+                className="btn-primary mt-4"
+                onClick={() => {
+                  onClose();
+                  onChangelog();
+                }}
+              >
+                <SparklesIcon /> Kiểm tra cập nhật & xem có gì mới
+              </button>
               <p className="mt-4 max-w-sm text-[12.5px] leading-relaxed text-mute">
                 Tải tệp nhanh hơn bằng cách chia nhỏ và tải song song nhiều đoạn. Hỗ trợ tạm dừng, tiếp tục sau khi tắt máy, và tự
                 bắt lượt tải từ trình duyệt.

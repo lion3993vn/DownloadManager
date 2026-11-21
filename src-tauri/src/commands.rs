@@ -194,3 +194,27 @@ pub fn answer_pair_request(state: State<'_, AppState>, id: u64, approve: bool) {
         let _ = tx.send(approve);
     }
 }
+
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> CmdResult<crate::updater::UpdateStatus> {
+    crate::updater::check(&app).await
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> CmdResult<()> {
+    crate::updater::install(app).await
+}
+
+#[tauri::command]
+pub async fn list_releases() -> CmdResult<Vec<crate::updater::ReleaseInfo>> {
+    crate::updater::releases().await
+}
+
+/// Open a web link (from release notes) in the default browser.
+#[tauri::command]
+pub fn open_url(app: AppHandle, url: String) -> CmdResult<()> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("Chỉ mở được liên kết http(s)".into());
+    }
+    app.opener().open_url(url, None::<&str>).map_err(err)
+}

@@ -124,6 +124,31 @@ export interface ConnectedExtension {
   lastSeen: number;
 }
 
+export interface AvailableUpdate {
+  version: string;
+  date: string | null;
+  notes: string | null;
+}
+
+export interface UpdateStatus {
+  currentVersion: string;
+  available: AvailableUpdate | null;
+}
+
+export interface ReleaseInfo {
+  version: string;
+  name: string;
+  notes: string;
+  publishedAt: string | null;
+  url: string;
+  prerelease: boolean;
+}
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
+}
+
 export const api = {
   list: () => invoke<DownloadInfo[]>("list_downloads"),
   add: (request: NewDownload) => invoke<DownloadInfo>("add_download", { request }),
@@ -147,6 +172,10 @@ export const api = {
   connectedExtensions: () => invoke<ConnectedExtension[]>("connected_extensions"),
   openBrowserExtensions: (browserId: string) => invoke<void>("open_browser_extensions", { browserId }),
   revealExtensionFolder: () => invoke<void>("reveal_extension_folder"),
+  checkUpdate: () => invoke<UpdateStatus>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
+  listReleases: () => invoke<ReleaseInfo[]>("list_releases"),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
 };
 
 export const onEngineEvent = (cb: (e: EngineEvent) => void): Promise<UnlistenFn> =>
@@ -159,3 +188,22 @@ export const onPairRequest = (cb: (r: PairRequest) => void): Promise<UnlistenFn>
 
 export const onExtensionConnected = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
   listen<ConnectedExtension>("dm://extension-connected", (e) => cb(e.payload));
+
+export const onUpdateAvailable = (cb: (u: AvailableUpdate) => void): Promise<UnlistenFn> =>
+  listen<AvailableUpdate>("dm://update-available", (e) => cb(e.payload));
+
+export const onUpdateProgress = (cb: (p: UpdateProgress) => void): Promise<UnlistenFn> =>
+  listen<UpdateProgress>("dm://update-progress", (e) => cb(e.payload));
+
+export const onUpdateInstalling = (cb: () => void): Promise<UnlistenFn> => listen("dm://update-installing", () => cb());
+
+/** Compare dotted versions numerically: >0 if a is newer than b. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+}

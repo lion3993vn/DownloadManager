@@ -3,6 +3,7 @@ mod commands;
 mod extension_setup;
 mod state;
 mod tray;
+mod updater;
 mod window;
 
 use dm_core::{Engine, EngineEvent};
@@ -18,6 +19,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let db_path = app.path().app_data_dir()?.join("downloads.db");
             let engine = tauri::async_runtime::block_on(async { Engine::open(&db_path) })?;
@@ -29,6 +31,7 @@ pub fn run() {
             }
             bridge::start(app.handle().clone());
             tray::setup(app.handle())?;
+            updater::spawn_periodic_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -63,6 +66,10 @@ pub fn run() {
             commands::connected_extensions,
             commands::open_browser_extensions,
             commands::reveal_extension_folder,
+            commands::check_update,
+            commands::install_update,
+            commands::list_releases,
+            commands::open_url,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the application");

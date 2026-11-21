@@ -1,5 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
-import type { ConnectedExtension } from "../lib/api";
+import type { AvailableUpdate, ConnectedExtension } from "../lib/api";
 import {
   AppIcon,
   ArchiveIcon,
@@ -13,6 +13,7 @@ import {
   PlusIcon,
   PuzzleIcon,
   SettingsIcon,
+  SparklesIcon,
   VideoIcon,
 } from "./Icons";
 import type { FileKind } from "../lib/format";
@@ -48,6 +49,9 @@ interface Props {
   onAdd: () => void;
   onSettings: () => void;
   onInstallExtension: () => void;
+  version: string;
+  update: AvailableUpdate | null;
+  onChangelog: () => void;
 }
 
 function Item({ icon: Icon, label, count, active, onClick }: { icon: IconT; label: string; count?: number; active: boolean; onClick: () => void }) {
@@ -151,9 +155,31 @@ export function Sidebar(p: Props) {
             </span>
           </button>
         )}
-        <button onClick={p.onSettings} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-ink/[0.045]">
-          <SettingsIcon className="h-[17px] w-[17px] text-mute" /> Cài đặt
-        </button>
+        {p.update && (
+          <button
+            onClick={p.onChangelog}
+            className="flex w-full items-center gap-2.5 rounded-lg border border-brand/30 bg-brand/8 px-3 py-2 text-left transition hover:bg-brand/12"
+          >
+            <SparklesIcon className="h-4 w-4 shrink-0 text-brand" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold text-brand">Có bản mới v{p.update.version}</span>
+              <span className="block text-[11px] text-mute">Bấm để cập nhật</span>
+            </span>
+          </button>
+        )}
+        <div className="flex items-center">
+          <button onClick={p.onSettings} className="flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-ink-2 hover:bg-ink/[0.045]">
+            <SettingsIcon className="h-[17px] w-[17px] text-mute" /> Cài đặt
+          </button>
+          <button
+            onClick={p.onChangelog}
+            title="Cập nhật & nhật ký thay đổi"
+            className="relative rounded-md px-2 py-1 text-[11px] tabular-nums text-faint hover:bg-ink/[0.045] hover:text-ink-2"
+          >
+            {p.version ? `v${p.version}` : "…"}
+            {p.update && <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-brand" />}
+          </button>
+        </div>
       </div>
     </aside>
   );

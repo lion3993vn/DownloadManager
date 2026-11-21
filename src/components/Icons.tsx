@@ -245,3 +245,9 @@ export const ClipboardIcon = (p: P) => (
     <path d="M9 4V3h6v1M9 10h6M9 14h4" />
   </Icon>
 );
+export const SparklesIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 3.5 13.6 8a2 2 0 0 0 1.2 1.2L19.5 11l-4.7 1.7a2 2 0 0 0-1.2 1.2L12 18.5l-1.6-4.6a2 2 0 0 0-1.2-1.2L4.5 11l4.7-1.8A2 2 0 0 0 10.4 8z" />
+    <path d="M19 3v3M17.5 4.5h3M5 17v3M3.5 18.5h3" />
+  </Icon>
+);
