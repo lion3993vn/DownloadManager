@@ -6,7 +6,11 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### 🐛 Sửa lỗi
+- **App không nhận ra extension đã cài trên Chrome/Edge/Cốc Cốc**: extension đã ghép cặp thành công nhưng trình hướng dẫn vẫn báo "Chưa cài". Nguyên nhân là trình duyệt nhân Chromium không gửi header `Origin` cho request GET từ extension. Nay extension gửi kèm định danh của mình (`X-DM-Extension`) và app ghi nhận kết nối ngay.
+
 ### 🔧 Cải tiến
+- Bước "Chờ kết nối" có hướng dẫn: bấm biểu tượng extension trên thanh công cụ để kết nối ngay.
 - Tự động hoá phát hành: `pnpm release <version>` → CI build, đính kèm bộ cài và extension, viết mô tả rồi publish.
 
 ## [0.3.0] - 2026-11-21

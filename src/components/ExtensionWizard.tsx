@@ -229,10 +229,16 @@ export function ExtensionWizard({ connected, onClose, onError }: Props) {
 
 function Waiting() {
   return (
-    <span className="inline-flex items-center gap-2 text-[12.5px] text-mute">
-      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
-      Đang chờ extension kết nối với app…
-    </span>
+    <div>
+      <span className="inline-flex items-center gap-2 text-[12.5px] text-mute">
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
+        Đang chờ extension kết nối với app…
+      </span>
+      <p className="mt-1.5 text-[12px] text-mute">
+        Đã cài mà chưa thấy? Bấm biểu tượng <b className="font-medium text-ink-2">DownloadManager</b> trên thanh công cụ của trình duyệt
+        (hình mảnh ghép 🧩 nếu đang bị ẩn) để kết nối ngay.
+      </p>
+    </div>
   );
 }
 

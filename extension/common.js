@@ -40,7 +40,14 @@ function dmBrowserName() {
 }
 
 function dmHeaders(s, extra = {}) {
-  return { "X-DM-Token": s.token, "X-DM-Browser": dmBrowserName(), ...extra };
+  return {
+    "X-DM-Token": s.token,
+    "X-DM-Browser": dmBrowserName(),
+    // Chromium drops the Origin header on GET requests from extensions with
+    // host permissions; tell the app who we are explicitly.
+    "X-DM-Extension": new URL(ext.runtime.getURL("")).origin,
+    ...extra,
+  };
 }
 
 /** -> { running: bool, paired: bool } */

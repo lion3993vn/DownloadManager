@@ -20,6 +20,9 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 
 const TOKEN_HEADER: &str = "x-dm-token";
 const BROWSER_HEADER: &str = "x-dm-browser";
+/// The extension's own origin. Chromium omits `Origin` on GET requests made
+/// by extensions with host permissions, so the ping carries it explicitly.
+const EXTENSION_HEADER: &str = "x-dm-extension";
 
 pub fn start(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -62,6 +65,7 @@ fn router(app: AppHandle) -> Router {
             header::CONTENT_TYPE,
             HeaderName::from_static(TOKEN_HEADER),
             HeaderName::from_static(BROWSER_HEADER),
+            HeaderName::from_static(EXTENSION_HEADER),
         ]);
     Router::new()
         .route("/api/ping", get(ping))
@@ -95,12 +99,19 @@ fn token_valid(app: &AppHandle, headers: &HeaderMap) -> bool {
 }
 
 /// Remember which browser extension is connected and tell the UI about new ones.
+/// Origin of the calling extension: the `Origin` header when the browser
+/// sends one, otherwise the extension's self-reported `X-DM-Extension`.
+/// Only used for requests that already passed the token check.
+fn extension_origin(headers: &HeaderMap) -> Option<&str> {
+    [header::ORIGIN.as_str(), EXTENSION_HEADER]
+        .into_iter()
+        .filter_map(|name| headers.get(name))
+        .find(|v| is_extension_origin(v))
+        .and_then(|v| v.to_str().ok())
+}
+
 fn note_extension(app: &AppHandle, headers: &HeaderMap) {
-    let Some(origin) = headers
-        .get(header::ORIGIN)
-        .filter(|o| is_extension_origin(o))
-        .and_then(|o| o.to_str().ok())
-    else {
+    let Some(origin) = extension_origin(headers) else {
         return;
     };
     let browser = headers
@@ -216,4 +227,46 @@ async fn capture(
         return error(StatusCode::BAD_REQUEST, &e.to_string());
     }
     Json(json!({ "ok": true })).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        for (k, v) in pairs {
+            h.insert(
+                HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                HeaderValue::from_str(v).unwrap(),
+            );
+        }
+        h
+    }
+
+    #[test]
+    fn origin_header_wins() {
+        let h = headers(&[
+            ("origin", "chrome-extension://aaa"),
+            (EXTENSION_HEADER, "chrome-extension://bbb"),
+        ]);
+        assert_eq!(extension_origin(&h), Some("chrome-extension://aaa"));
+    }
+
+    #[test]
+    fn falls_back_to_extension_header_without_origin() {
+        // Chromium GET from an extension with host permissions: no Origin.
+        let h = headers(&[(EXTENSION_HEADER, "chrome-extension://bbb")]);
+        assert_eq!(extension_origin(&h), Some("chrome-extension://bbb"));
+    }
+
+    #[test]
+    fn ignores_non_extension_values() {
+        let h = headers(&[
+            ("origin", "https://evil.example"),
+            (EXTENSION_HEADER, "https://evil.example"),
+        ]);
+        assert_eq!(extension_origin(&h), None);
+        assert_eq!(extension_origin(&HeaderMap::new()), None);
+    }
 }
