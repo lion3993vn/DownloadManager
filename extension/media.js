@@ -380,7 +380,39 @@ function mediaPickBest(items, frameId) {
   return list.reduce((best, i) => (!best || score(i) > score(best) ? i : best), null);
 }
 
+// ---------------------------------------------------------------------------
+// Video pages (YouTube, TikTok…): the app downloads them with yt-dlp
+// ---------------------------------------------------------------------------
+
+/** Pages whose video the app can fetch by URL (yt-dlp). */
+const MEDIA_PAGES = [
+  ["YouTube", /^https?:\/\/(www\.|m\.|music\.)?youtube\.com\/(watch\?|shorts\/|live\/|embed\/)|^https?:\/\/youtu\.be\/|^https?:\/\/(www\.)?youtube-nocookie\.com\/embed\//],
+  ["TikTok", /^https?:\/\/(www\.|m\.)?tiktok\.com\/(@[^/]+\/video\/\d+|embed)/],
+  ["Facebook", /^https?:\/\/(www\.|m\.|web\.)?facebook\.com\/(.+\/videos\/|watch\/?\?|reel\/|share\/[vr]\/)|^https?:\/\/fb\.watch\//],
+  ["Instagram", /^https?:\/\/(www\.)?instagram\.com\/(p|reel|reels|tv)\//],
+  ["X", /^https?:\/\/(www\.|mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/],
+  ["Vimeo", /^https?:\/\/(www\.)?vimeo\.com\/\d+|^https?:\/\/player\.vimeo\.com\/video\/\d+/],
+  ["Dailymotion", /^https?:\/\/(www\.)?dailymotion\.com\/(video|embed\/video)\/|^https?:\/\/dai\.ly\//],
+  ["SoundCloud", /^https?:\/\/(www\.|m\.)?soundcloud\.com\/[^/]+\/[^/?#]+/],
+  ["Bilibili", /^https?:\/\/(www\.)?bilibili\.com\/video\//],
+  ["Twitch", /^https?:\/\/(www\.)?twitch\.tv\/(videos\/\d+|[^/]+\/clip\/)|^https?:\/\/clips\.twitch\.tv\//],
+];
+
+/** -> site name when `url` is a video page, else null. */
+function mediaPageSite(url) {
+  if (!url) return null;
+  const hit = MEDIA_PAGES.find(([, re]) => re.test(url));
+  return hit ? hit[0] : null;
+}
+
+function mediaPageItem(url) {
+  const site = mediaPageSite(url);
+  if (!site) return null;
+  return { id: "page", url: url.split("#")[0], type: "page", site, frameId: null };
+}
+
 function mediaLabel(item) {
+  if (item.type === "page") return item.site;
   const parts = [];
   if (item.type === "hls") parts.push("HLS");
   else parts.push(mediaExtFor(item).toUpperCase());
@@ -397,41 +429,64 @@ async function mediaSend(tabId, item) {
   } catch {
     /* closed */
   }
-  const title = mediaCleanTitle(tab && tab.title);
-  const base = title || mediaCleanTitle(mediaUrlName(item.url).replace(/\.[a-z0-9]+$/i, "")) || "video";
-  const ok = await sendToApp(s, {
-    url: item.url,
-    fileName: `${base}.${mediaExtFor(item)}`,
-    fileSize: item.type === "hls" ? 0 : item.size || 0,
-    mime: item.mime,
-    referrer: item.referrer || (tab && tab.url) || null,
-    kind: item.type === "hls" ? "hls" : null,
-  });
+  let ok;
+  if (item.type === "page") {
+    // The app asks yt-dlp for the title and lets the user pick a quality.
+    ok = await sendToApp(s, { url: item.url, referrer: null, kind: "media" });
+  } else {
+    const title = mediaCleanTitle(tab && tab.title);
+    const base = title || mediaCleanTitle(mediaUrlName(item.url).replace(/\.[a-z0-9]+$/i, "")) || "video";
+    ok = await sendToApp(s, {
+      url: item.url,
+      fileName: `${base}.${mediaExtFor(item)}`,
+      fileSize: item.type === "hls" ? 0 : item.size || 0,
+      mime: item.mime,
+      referrer: item.referrer || (tab && tab.url) || null,
+      kind: item.type === "hls" ? "hls" : null,
+    });
+  }
   flashBadge(ok ? "✓" : "!", ok ? "#16a34a" : "#dc2626", tabId);
   return ok ? { ok: true } : { ok: false, error: "App không nhận (hãy mở DownloadManager)" };
 }
 
+async function mediaTabUrl(tabId) {
+  try {
+    return (await ext.tabs.get(tabId)).url || null;
+  } catch {
+    return null;
+  }
+}
+
 ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handlers = {
-    // Popup: everything found in a tab.
+    // Popup: everything found in a tab (the page itself first on video sites).
     "media-list": async () => {
       const items = mediaVisible(await mediaLoad(msg.tabId));
-      return items.map((i) => ({ ...i, label: mediaLabel(i), problem: mediaProblem(i), urlName: mediaUrlName(i.url) }));
+      const page = mediaPageItem(await mediaTabUrl(msg.tabId));
+      return [...(page ? [page] : []), ...items].map((i) => ({
+        ...i,
+        label: mediaLabel(i),
+        problem: mediaProblem(i),
+        urlName: mediaUrlName(i.url),
+      }));
     },
     "media-download": async () => {
-      const item = (await mediaLoad(msg.tabId)).find((i) => i.id === msg.id);
+      const item =
+        msg.id === "page"
+          ? mediaPageItem(await mediaTabUrl(msg.tabId))
+          : (await mediaLoad(msg.tabId)).find((i) => i.id === msg.id);
       return item ? mediaSend(msg.tabId, item) : { ok: false, error: "Không còn thấy video này" };
     },
-    // Content script: the stream behind the video element under the pointer.
+    // Content script: what the video element under the pointer can be saved as.
     "media-best": async () => {
       const prefs = await dmSettings();
       if (!prefs.showVideoButton || !sender.tab) return null;
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pageUrl);
       return item ? { label: mediaLabel(item) } : null;
     },
     "media-download-best": async () => {
       if (!sender.tab) return { ok: false };
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pageUrl);
       if (!item) return { ok: false, error: "Không tìm thấy luồng tải được" };
       return mediaSend(sender.tab.id, item);
     },
@@ -442,8 +497,14 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-/** A direct http(s) src wins; blob: sources (MSE players) map to the best stream seen. */
-async function mediaForElement(tabId, frameId, src) {
+/**
+ * On a video page (or an embedded player from one) the page URL wins: the app
+ * fetches it with yt-dlp. Otherwise a direct http(s) src, else the best stream
+ * seen in the frame (blob: sources from streaming players).
+ */
+async function mediaForElement(tabId, frameId, src, pageUrl) {
+  const page = mediaPageItem(pageUrl);
+  if (page) return page;
   const items = await mediaLoad(tabId);
   if (src && /^https?:/i.test(src)) {
     const known = items.find((i) => i.url === src);

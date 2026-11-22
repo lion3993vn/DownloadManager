@@ -516,3 +516,28 @@ async fn serve_hls(State(s): State<Srv>, Path(name): Path<String>, headers: Head
         _ => StatusCode::NOT_FOUND.into_response(),
     }
 }
+
+/// Like [`wait_done`] with a custom deadline (real network downloads).
+pub async fn wait_done_within(
+    engine: &Engine,
+    events: &mut Receiver<EngineEvent>,
+    id: DownloadId,
+    secs: u64,
+) -> DownloadInfo {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(secs);
+    loop {
+        if let Some(d) = engine.get(id) {
+            match d.status {
+                Status::Completed => return d,
+                Status::Failed | Status::Canceled => panic!("download ended: {:?}", d.error),
+                _ => {}
+            }
+        }
+        if tokio::time::timeout_at(deadline, events.recv())
+            .await
+            .is_err()
+        {
+            panic!("timed out; last state: {:?}", engine.get(id))
+        }
+    }
+}

@@ -9,12 +9,14 @@ export interface SegmentInfo {
   done: number;
 }
 
-export type DownloadKind = "file" | "hls";
+export type DownloadKind = "file" | "hls" | "media";
 
 export interface DownloadInfo {
   id: number;
   url: string;
   kind: DownloadKind;
+  /** Quality picked for a video page (`media`). */
+  mediaQuality: string | null;
   fileName: string;
   saveDir: string;
   totalSize: number | null;
@@ -58,6 +60,7 @@ export interface NewDownload {
   headers?: RequestHeaders;
   startPaused?: boolean;
   kind?: DownloadKind | null;
+  mediaQuality?: string | null;
 }
 
 export interface ProbeResult {
@@ -67,7 +70,45 @@ export interface ProbeResult {
   contentType: string | null;
   finalUrl: string;
   stream: StreamInfo | null;
+  media: MediaInfo | null;
 }
+
+/** A video page described by yt-dlp (see `dm_core::MediaInfo`). */
+export interface MediaInfo {
+  title: string;
+  site: string;
+  uploader: string | null;
+  durationSecs: number | null;
+  thumbnail: string | null;
+  isLive: boolean;
+  /** Best first; the last one is audio only (`id: "audio"`). */
+  qualities: MediaQuality[];
+  needsFfmpegForBest: boolean;
+}
+
+export interface MediaQuality {
+  id: string;
+  label: string;
+  estimatedSize: number | null;
+}
+
+export interface ToolsStatus {
+  ytdlpVersion: string | null;
+  ffmpeg: boolean;
+  ffmpegFromSystem: boolean;
+  canInstallFfmpeg: boolean;
+  busy: boolean;
+  installSize: number;
+}
+
+export interface ToolsProgress {
+  step: "yt-dlp" | "ffmpeg" | "extract" | "update";
+  downloaded: number;
+  total: number | null;
+}
+
+/** The engine error when a video page needs yt-dlp first. */
+export const isMediaToolsMissing = (e: unknown) => /media tools/i.test(String(e));
 
 /** An HLS video stream (see `dm_core::StreamInfo`). */
 export interface StreamInfo {
@@ -191,6 +232,10 @@ export const api = {
   extensionSetupInfo: () => invoke<ExtensionSetupInfo>("extension_setup_info"),
   connectedExtensions: () => invoke<ConnectedExtension[]>("connected_extensions"),
   extensionVersion: () => invoke<string | null>("extension_version"),
+  mediaToolsStatus: () => invoke<ToolsStatus>("media_tools_status"),
+  installMediaTools: () => invoke<ToolsStatus>("install_media_tools"),
+  updateMediaTools: () => invoke<ToolsStatus>("update_media_tools"),
+  removeMediaTools: () => invoke<void>("remove_media_tools"),
   openBrowserExtensions: (browserId: string) => invoke<void>("open_browser_extensions", { browserId }),
   revealExtensionFolder: () => invoke<void>("reveal_extension_folder"),
   checkUpdate: () => invoke<UpdateStatus>("check_update"),
@@ -209,6 +254,9 @@ export const onPairRequest = (cb: (r: PairRequest) => void): Promise<UnlistenFn>
 
 export const onExtensionConnected = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
   listen<ConnectedExtension>("dm://extension-connected", (e) => cb(e.payload));
+
+export const onToolsProgress = (cb: (p: ToolsProgress) => void): Promise<UnlistenFn> =>
+  listen<ToolsProgress>("dm://tools-progress", (e) => cb(e.payload));
 
 export const onExtensionUpdated = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
   listen<ConnectedExtension>("dm://extension-updated", (e) => cb(e.payload));

@@ -228,7 +228,10 @@ async fn capture(
         return error(StatusCode::BAD_REQUEST, "only http(s) URLs are supported");
     }
     let state = app.state::<AppState>();
-    if state.app_settings().confirm_captures {
+    // Without yt-dlp a video page cannot start; the dialog offers to install it.
+    let needs_tools =
+        c.kind == Some(dm_core::DownloadKind::Media) && state.engine.media_tools().is_none();
+    if state.app_settings().confirm_captures || needs_tools {
         c.id = state.next_id();
         state.captures.lock().unwrap().push(c);
         let _ = app.emit("dm://capture", ());

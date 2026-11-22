@@ -140,11 +140,19 @@ const ERROR_TEXT: [RegExp, string][] = [
   [/audio is a separate stream/i, "Video này tách riêng tiếng và hình, chưa được hỗ trợ."],
   [/not an HLS playlist/i, "Liên kết không phải danh sách phát HLS hợp lệ."],
   [/could not decrypt a segment/i, "Không giải mã được video (sai khóa?)."],
+  [/media tools/i, "Cần cài công cụ tải video (yt-dlp): Cài đặt → Video."],
+  [/this link is a playlist/i, "Đây là danh sách phát. Hãy mở một video cụ thể rồi tải."],
+  [/yt-dlp: .*(Private video|This video is private)/i, "Video riêng tư, không tải được."],
+  [/yt-dlp: .*(Sign in to confirm|confirm your age|age-restricted)/i, "Video yêu cầu đăng nhập hoặc xác nhận tuổi."],
+  [/yt-dlp: .*(Video unavailable|not available)/i, "Video không còn hoặc không xem được ở khu vực này."],
+  [/yt-dlp: .*Unsupported URL/i, "Trang này không có video tải được."],
   [/server responded with HTTP 403/i, "Máy chủ từ chối truy cập (HTTP 403). Liên kết có thể đã hết hạn."],
 ];
 
 export function errorText(message: string | null | undefined): string {
   if (!message) return "";
   for (const [re, text] of ERROR_TEXT) if (re.test(message)) return text;
+  const yt = /^yt-dlp: (.*)/s.exec(message);
+  if (yt) return `Không tải được video: ${yt[1]}`;
   return message;
 }

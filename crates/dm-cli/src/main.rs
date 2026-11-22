@@ -6,13 +6,15 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-const USAGE: &str = "usage: dm-cli <URL> [-c CONNECTIONS] [-o OUTPUT_DIR] [-l LIMIT_KB_PER_SEC]";
+const USAGE: &str = "usage: dm-cli <URL> [-c CONNECTIONS] [-o OUTPUT_DIR] [-l LIMIT_KB_PER_SEC] [-q best|1080|720|…|audio]
+  video pages (YouTube…) need DM_YTDLP=<path to yt-dlp> (and DM_FFMPEG=<path to ffmpeg>)";
 
 struct Args {
     url: String,
     connections: u32,
     out_dir: PathBuf,
     limit_kbps: u64,
+    quality: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -23,6 +25,7 @@ fn parse_args() -> Result<Args, String> {
         connections: 8,
         out_dir: std::env::current_dir().map_err(|e| e.to_string())?,
         limit_kbps: 0,
+        quality: None,
     };
     while let Some(a) = it.next() {
         let mut value = |name: &str| it.next().ok_or(format!("missing value for {name}"));
@@ -31,6 +34,7 @@ fn parse_args() -> Result<Args, String> {
                 args.connections = value("-c")?.parse().map_err(|_| "invalid -c")?
             }
             "-o" | "--output" => args.out_dir = PathBuf::from(value("-o")?),
+            "-q" | "--quality" => args.quality = Some(value("-q")?),
             "-l" | "--limit" => args.limit_kbps = value("-l")?.parse().map_err(|_| "invalid -l")?,
             "-h" | "--help" => return Err(USAGE.into()),
             _ if url.is_none() && !a.starts_with('-') => url = Some(a),
@@ -74,10 +78,18 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // Video pages (YouTube…) need yt-dlp; point at it with DM_YTDLP (and DM_FFMPEG).
+    if let Some(ytdlp) = std::env::var_os("DM_YTDLP") {
+        engine.set_media_tools(Some(dm_core::MediaTools {
+            ytdlp: ytdlp.into(),
+            ffmpeg: std::env::var_os("DM_FFMPEG").map(Into::into),
+        }));
+    }
     let mut events = engine.subscribe();
     let started = Instant::now();
     let id = match engine.add(NewDownload {
         url: args.url,
+        media_quality: args.quality.clone(),
         ..Default::default()
     }) {
         Ok(d) => d.id,

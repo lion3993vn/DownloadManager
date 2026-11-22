@@ -36,6 +36,8 @@ pub(crate) struct Inner {
     state: Mutex<State>,
     rt: Handle,
     shutting_down: AtomicBool,
+    /// yt-dlp / ffmpeg for video pages, provided by the host app.
+    media_tools: RwLock<Option<crate::MediaTools>>,
 }
 
 #[derive(Default)]
@@ -51,20 +53,33 @@ impl Engine {
     /// Open (or create) the database at `db_path` and restore previous downloads.
     /// Must be called from within a Tokio runtime.
     pub fn open(db_path: &Path) -> Result<Engine> {
+        Self::open_with_media_tools(db_path, None)
+    }
+
+    /// Like [`open`](Self::open), with yt-dlp already known, so video downloads
+    /// interrupted last time can resume right away.
+    pub fn open_with_media_tools(
+        db_path: &Path,
+        media_tools: Option<crate::MediaTools>,
+    ) -> Result<Engine> {
         let store = Store::open(db_path)?;
         let settings = store
             .get_kv(SETTINGS_KEY)?
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
-        Self::build(store, settings)
+        Self::build(store, settings, media_tools)
     }
 
     /// Non-persistent engine (CLI, tests). Must be called from within a Tokio runtime.
     pub fn in_memory(settings: EngineSettings) -> Result<Engine> {
-        Self::build(Store::open_in_memory()?, settings)
+        Self::build(Store::open_in_memory()?, settings, None)
     }
 
-    fn build(store: Store, settings: EngineSettings) -> Result<Engine> {
+    fn build(
+        store: Store,
+        settings: EngineSettings,
+        media_tools: Option<crate::MediaTools>,
+    ) -> Result<Engine> {
         let mut downloads = BTreeMap::new();
         for mut d in store.load_all()? {
             // Interrupted by a crash or shutdown: put back in the queue.
@@ -89,6 +104,7 @@ impl Engine {
                 Error::Other("Engine must be created inside a Tokio runtime".into())
             })?,
             shutting_down: AtomicBool::new(false),
+            media_tools: RwLock::new(media_tools),
         });
         inner.schedule();
         Ok(Engine { inner })
@@ -145,8 +161,21 @@ impl Engine {
         self.inner.store.set_kv(key, value)
     }
 
+    /// Where yt-dlp (and ffmpeg) are; `None` disables video-page downloads.
+    pub fn set_media_tools(&self, tools: Option<crate::MediaTools>) {
+        *self.inner.media_tools.write().unwrap() = tools;
+    }
+
+    pub fn media_tools(&self) -> Option<crate::MediaTools> {
+        self.inner.media_tools()
+    }
+
     /// Inspect a URL (size, name, range support) without downloading it.
     pub async fn probe(&self, url: &str, headers: &RequestHeaders) -> Result<ProbeResult> {
+        if crate::media::is_media_site(url) {
+            let tools = self.inner.media_tools().ok_or(Error::MediaToolsMissing)?;
+            return crate::media::probe(&tools, url, headers).await;
+        }
         let mut probe = http::probe(&self.inner.client, url, headers).await?;
         if crate::hls::is_playlist(&probe) {
             let stream = crate::hls::inspect(&self.inner.client, &probe.final_url, headers).await?;
@@ -154,6 +183,16 @@ impl Engine {
             probe.total_size = stream.estimated_size;
             probe.resumable = !stream.live;
             probe.stream = Some(stream);
+        } else if let Some(tools) = self.inner.media_tools().filter(|_| {
+            probe
+                .content_type
+                .as_deref()
+                .is_some_and(|t| t.starts_with("text/html"))
+        }) {
+            // A web page: if yt-dlp finds a video on it, offer that instead.
+            if let Ok(media) = crate::media::probe(&tools, &probe.final_url, headers).await {
+                return Ok(media);
+            }
         }
         Ok(probe)
     }
@@ -165,9 +204,19 @@ impl Engine {
             .save_dir
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or(settings.download_dir);
-        let kind = req
-            .kind
-            .unwrap_or_else(|| crate::hls::kind_from_url(&req.url));
+        let kind = req.kind.unwrap_or_else(|| {
+            if crate::media::is_media_site(&req.url) {
+                DownloadKind::Media
+            } else {
+                crate::hls::kind_from_url(&req.url)
+            }
+        });
+        let media_quality = (kind == DownloadKind::Media).then(|| {
+            req.media_quality
+                .clone()
+                .filter(|q| !q.trim().is_empty())
+                .unwrap_or_else(|| crate::DEFAULT_MEDIA_QUALITY.to_string())
+        });
         let auto_name = req.file_name.as_deref().is_none_or(|n| n.trim().is_empty());
         let wanted = match req.file_name.as_deref() {
             Some(n) if !auto_name => naming::sanitize(n),
@@ -175,12 +224,21 @@ impl Engine {
         };
         let wanted = match kind {
             DownloadKind::Hls => crate::hls::output_name(&wanted, "ts"),
+            DownloadKind::Media => crate::media::with_ext(
+                &wanted,
+                if media_quality.as_deref() == Some("audio") {
+                    "mp3"
+                } else {
+                    "mp4"
+                },
+            ),
             DownloadKind::File => wanted,
         };
         let mut info = DownloadInfo {
             id: 0,
             url: req.url,
             kind,
+            media_quality,
             file_name: wanted,
             save_dir,
             total_size: None,
@@ -341,6 +399,10 @@ impl Inner {
         self.settings.read().unwrap().clone()
     }
 
+    pub(crate) fn media_tools(&self) -> Option<crate::MediaTools> {
+        self.media_tools.read().unwrap().clone()
+    }
+
     pub(crate) fn snapshot(&self, id: DownloadId) -> Result<DownloadInfo> {
         self.get_cloned(id).ok_or(Error::NotFound(id))
     }
@@ -379,6 +441,7 @@ impl Inner {
         let mut st = self.state.lock().unwrap();
         let d = st.downloads.get_mut(&info.id)?;
         d.kind = info.kind;
+        d.media_quality.clone_from(&info.media_quality);
         d.file_name.clone_from(&info.file_name);
         d.total_size = info.total_size;
         d.downloaded = info.downloaded;

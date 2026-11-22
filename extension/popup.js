@@ -78,6 +78,7 @@ $("pair").addEventListener("click", async () => {
 
 const ICONS = {
   hls: '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/>',
+  page: '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/>',
   video: '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/>',
   audio: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
 };
@@ -129,20 +130,25 @@ function renderMedia(items) {
   $("media-count").hidden = items.length === 0;
   $("media-count").textContent = items.length;
   // Newest first: the video the user just started is usually what they want.
-  for (const item of [...items].reverse()) {
+  // The video page (YouTube…) stays on top.
+  const ordered = [...items.filter((i) => i.type === "page"), ...items.filter((i) => i.type !== "page").reverse()];
+  for (const item of ordered) {
     const li = el("li", "media-item");
     const icon = el("span", `media-icon ${item.type}`);
     icon.innerHTML = `<svg class="i" viewBox="0 0 24 24">${ICONS[item.type] || ICONS.video}</svg>`;
 
     const text = el("div", "media-text");
     const title =
-      item.type === "hls"
+      item.type === "page"
+        ? `Video trên ${item.site}`
+        : item.type === "hls"
         ? `Video HLS${item.resolution ? ` · ${Math.min(...item.resolution)}p` : ""}`
         : item.urlName || item.label;
     const t = el("div", "media-title", title);
     t.title = item.url;
     const meta = [];
-    if (item.type !== "hls") meta.push(item.label);
+    if (item.type === "page") meta.push("Chọn chất lượng hoặc MP3 trong app");
+    else if (item.type !== "hls") meta.push(item.label);
     if (item.duration && !item.live) meta.push(formatDuration(item.duration));
     if (item.size) meta.push((item.type === "hls" ? "≈ " : "") + formatBytes(item.size));
     meta.push(hostOf(item.url));

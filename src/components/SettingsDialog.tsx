@@ -15,7 +15,9 @@ import {
   SettingsIcon,
   SparklesIcon,
   SunIcon,
+  VideoIcon,
 } from "./Icons";
+import { MediaToolsPanel } from "./MediaTools";
 
 interface Props {
   theme: ThemePref;
@@ -29,11 +31,12 @@ interface Props {
   onChangelog: () => void;
 }
 
-type Tab = "download" | "browser" | "app" | "about";
+type Tab = "download" | "video" | "browser" | "app" | "about";
 type IconT = ComponentType<SVGProps<SVGSVGElement>>;
 
 const TABS: { key: Tab; label: string; icon: IconT }[] = [
   { key: "download", label: "Tải xuống", icon: DownloadIcon },
+  { key: "video", label: "Video", icon: VideoIcon },
   { key: "browser", label: "Trình duyệt", icon: PuzzleIcon },
   { key: "app", label: "Giao diện", icon: SettingsIcon },
   { key: "about", label: "Giới thiệu", icon: InfoIcon },
@@ -138,6 +141,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
         </nav>
 
         <div className="px-6 py-4">
+          {tab === "video" && <MediaToolsPanel onError={onError} />}
           {tab === "download" && (
             <>
               <Field label="Thư mục lưu mặc định">

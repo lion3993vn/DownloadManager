@@ -48,6 +48,9 @@ pub enum DownloadKind {
     /// An HLS playlist (`.m3u8`): every media segment is fetched and the
     /// segments are joined into one file.
     Hls,
+    /// A web page with a video (YouTube, Facebook, TikTok…), downloaded with
+    /// the external yt-dlp tool (see [`crate::MediaTools`]).
+    Media,
 }
 
 impl DownloadKind {
@@ -55,12 +58,14 @@ impl DownloadKind {
         match self {
             DownloadKind::File => "file",
             DownloadKind::Hls => "hls",
+            DownloadKind::Media => "media",
         }
     }
 
     pub fn parse(s: &str) -> DownloadKind {
         match s {
             "hls" => DownloadKind::Hls,
+            "media" => DownloadKind::Media,
             _ => DownloadKind::File,
         }
     }
@@ -95,6 +100,9 @@ pub struct NewDownload {
     /// `None`: detected from the URL (`.m3u8` means HLS) and the server response.
     #[serde(default)]
     pub kind: Option<DownloadKind>,
+    /// For [`DownloadKind::Media`]: `"best"`, a max height like `"1080"`, or `"audio"` (MP3).
+    #[serde(default)]
+    pub media_quality: Option<String>,
 }
 
 /// One byte range `[start, end)` of the file and how much of it is on disk.
@@ -112,6 +120,8 @@ pub struct DownloadInfo {
     pub id: DownloadId,
     pub url: String,
     pub kind: DownloadKind,
+    /// Quality chosen for a [`DownloadKind::Media`] download.
+    pub media_quality: Option<String>,
     pub file_name: String,
     pub save_dir: PathBuf,
     pub total_size: Option<u64>,
@@ -220,6 +230,8 @@ pub struct ProbeResult {
     pub final_url: String,
     /// Set when the URL is an HLS playlist.
     pub stream: Option<StreamInfo>,
+    /// Set when the URL is a page with a video that yt-dlp can download.
+    pub media: Option<MediaInfo>,
     #[serde(skip)]
     pub etag: Option<String>,
     #[serde(skip)]
@@ -245,4 +257,31 @@ pub struct StreamInfo {
     pub encrypted: bool,
     /// Output container: `"ts"` or `"mp4"` (fragmented MP4 with an init section).
     pub container: String,
+}
+
+/// A video page as described by yt-dlp, shown before downloading.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaInfo {
+    pub title: String,
+    /// Site name as yt-dlp reports it ("Youtube", "TikTok"…).
+    pub site: String,
+    pub uploader: Option<String>,
+    pub duration_secs: Option<f64>,
+    pub thumbnail: Option<String>,
+    pub is_live: bool,
+    /// Qualities that can be picked, best first; the last one is audio only.
+    pub qualities: Vec<MediaQuality>,
+    /// Without ffmpeg only files that already contain audio + video can be
+    /// downloaded, which caps the quality (often at 360p–720p).
+    pub needs_ffmpeg_for_best: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaQuality {
+    /// Value for [`NewDownload::media_quality`].
+    pub id: String,
+    pub label: String,
+    pub estimated_size: Option<u64>,
 }

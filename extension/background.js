@@ -200,7 +200,7 @@ ext.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   // Streaming players play from blob: URLs; use the stream found on the page.
   if (url && /^blob:/i.test(url) && tab && /^(video|audio)$/.test(info.mediaType || "")) {
-    const item = await mediaForElement(tab.id, info.frameId ?? 0, null);
+    const item = await mediaForElement(tab.id, info.frameId ?? 0, null, info.frameUrl || info.pageUrl);
     if (item) mediaSend(tab.id, item);
     else flashBadge("!", "#dc2626", tab.id);
     return;

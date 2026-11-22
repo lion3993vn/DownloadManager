@@ -43,6 +43,9 @@ pub(crate) async fn run(
     if info.kind == DownloadKind::Hls {
         return crate::hls::run(inner, info, token).await;
     }
+    if info.kind == DownloadKind::Media {
+        return crate::media::run(inner, info, token).await;
+    }
     let settings = inner.settings();
 
     // 1. Probe the server (also validates that a resume is still safe).

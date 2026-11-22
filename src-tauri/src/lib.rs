@@ -1,6 +1,7 @@
 mod bridge;
 mod commands;
 mod extension_setup;
+mod media_tools;
 mod state;
 mod tray;
 mod updater;
@@ -21,8 +22,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let db_path = app.path().app_data_dir()?.join("downloads.db");
-            let engine = tauri::async_runtime::block_on(async { Engine::open(&db_path) })?;
+            let data = app.path().app_data_dir()?;
+            let db_path = data.join("downloads.db");
+            let tools = media_tools::detect_in(&data.join("tools"));
+            let engine = tauri::async_runtime::block_on(async {
+                Engine::open_with_media_tools(&db_path, tools)
+            })?;
             forward_events(app.handle().clone(), engine.clone());
             app.manage(AppState::new(engine));
             // Refresh the unpacked extension (new version + current pairing token).
@@ -32,6 +37,7 @@ pub fn run() {
             bridge::start(app.handle().clone());
             tray::setup(app.handle())?;
             updater::spawn_periodic_check(app.handle().clone());
+            media_tools::start(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -65,6 +71,10 @@ pub fn run() {
             commands::extension_setup_info,
             commands::connected_extensions,
             commands::extension_version,
+            commands::media_tools_status,
+            commands::install_media_tools,
+            commands::update_media_tools,
+            commands::remove_media_tools,
             commands::open_browser_extensions,
             commands::reveal_extension_folder,
             commands::check_update,

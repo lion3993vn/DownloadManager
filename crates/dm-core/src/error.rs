@@ -26,6 +26,9 @@ pub enum Error {
     Timeout,
     #[error("connection closed before the segment was complete")]
     Incomplete,
+    /// A video page was given but yt-dlp is not installed (the app offers to install it).
+    #[error("media tools (yt-dlp) are not installed")]
+    MediaToolsMissing,
     #[error("{0}")]
     Other(String),
 }

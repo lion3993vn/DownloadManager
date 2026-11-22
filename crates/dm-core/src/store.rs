@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     etag           TEXT,
     last_modified  TEXT,
     auto_name      INTEGER NOT NULL DEFAULT 0,
-    kind           TEXT NOT NULL DEFAULT 'file'
+    kind           TEXT NOT NULL DEFAULT 'file',
+    media_quality  TEXT
 );
 CREATE TABLE IF NOT EXISTS segments (
     download_id  INTEGER NOT NULL REFERENCES downloads(id) ON DELETE CASCADE,
@@ -75,8 +76,8 @@ impl Store {
         conn.execute(
             "INSERT INTO downloads (url, file_name, save_dir, total_size, downloaded, status, error,
                 resumable, connections, created_at, completed_at, referrer, user_agent, cookies,
-                etag, last_modified, auto_name, kind)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+                etag, last_modified, auto_name, kind, media_quality)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 info.url,
                 info.file_name,
@@ -96,6 +97,7 @@ impl Store {
                 info.last_modified,
                 info.auto_name,
                 info.kind.as_str(),
+                info.media_quality,
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -108,7 +110,7 @@ impl Store {
         tx.execute(
             "UPDATE downloads SET file_name=?2, save_dir=?3, total_size=?4, downloaded=?5, status=?6,
                 error=?7, resumable=?8, connections=?9, completed_at=?10, etag=?11,
-                last_modified=?12, auto_name=?13, kind=?14
+                last_modified=?12, auto_name=?13, kind=?14, media_quality=?15
              WHERE id=?1",
             params![
                 info.id,
@@ -125,6 +127,7 @@ impl Store {
                 info.last_modified,
                 info.auto_name,
                 info.kind.as_str(),
+                info.media_quality,
             ],
         )?;
         tx.execute("DELETE FROM segments WHERE download_id=?1", [info.id])?;
@@ -157,7 +160,7 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT id, url, file_name, save_dir, total_size, downloaded, status, error, resumable,
                 connections, created_at, completed_at, referrer, user_agent, cookies, etag,
-                last_modified, auto_name, kind
+                last_modified, auto_name, kind, media_quality
              FROM downloads ORDER BY id",
         )?;
         let mut downloads = stmt
@@ -166,6 +169,7 @@ impl Store {
                     id: r.get(0)?,
                     url: r.get(1)?,
                     kind: DownloadKind::parse(&r.get::<_, String>(18)?),
+                    media_quality: r.get(19)?,
                     file_name: r.get(2)?,
                     save_dir: PathBuf::from(r.get::<_, String>(3)?),
                     total_size: r.get::<_, Option<i64>>(4)?.map(|v| v as u64),
@@ -225,11 +229,18 @@ impl Store {
 
 /// Bring databases created by older versions up to the current schema.
 fn migrate(conn: &Connection) -> Result<()> {
-    let has_kind = conn
-        .prepare("SELECT 1 FROM pragma_table_info('downloads') WHERE name='kind'")?
-        .exists([])?;
-    if !has_kind {
-        conn.execute_batch("ALTER TABLE downloads ADD COLUMN kind TEXT NOT NULL DEFAULT 'file'")?;
+    /// Columns added after the first release, in order.
+    const ADDED: &[(&str, &str)] = &[
+        ("kind", "TEXT NOT NULL DEFAULT 'file'"),
+        ("media_quality", "TEXT"),
+    ];
+    for (column, decl) in ADDED {
+        let exists = conn
+            .prepare("SELECT 1 FROM pragma_table_info('downloads') WHERE name=?1")?
+            .exists([column])?;
+        if !exists {
+            conn.execute_batch(&format!("ALTER TABLE downloads ADD COLUMN {column} {decl}"))?;
+        }
     }
     Ok(())
 }
@@ -239,9 +250,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migrates_databases_without_kind() {
-        let old_schema = SCHEMA.replace(",\n    kind           TEXT NOT NULL DEFAULT 'file'", "");
-        assert!(!old_schema.contains("kind"));
+    fn migrates_old_databases() {
+        let old_schema = SCHEMA.replace(
+            ",\n    kind           TEXT NOT NULL DEFAULT 'file',\n    media_quality  TEXT",
+            "",
+        );
+        assert!(!old_schema.contains("kind") && !old_schema.contains("media_quality"));
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(&old_schema).unwrap();
         conn.execute(
@@ -254,8 +268,12 @@ mod tests {
         let store = Store::init(conn).unwrap();
         let mut all = store.load_all().unwrap();
         assert_eq!(all[0].kind, DownloadKind::File);
-        all[0].kind = DownloadKind::Hls;
+        assert_eq!(all[0].media_quality, None);
+        all[0].kind = DownloadKind::Media;
+        all[0].media_quality = Some("720".into());
         store.save(&all[0]).unwrap();
-        assert_eq!(store.load_all().unwrap()[0].kind, DownloadKind::Hls);
+        let reloaded = &store.load_all().unwrap()[0];
+        assert_eq!(reloaded.kind, DownloadKind::Media);
+        assert_eq!(reloaded.media_quality.as_deref(), Some("720"));
     }
 }

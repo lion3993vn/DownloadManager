@@ -112,7 +112,7 @@
     if (hit && hit.src === src && Date.now() - hit.at < 4000) return hit.result;
     let result = null;
     try {
-      result = await ext.runtime.sendMessage({ type: "media-best", src });
+      result = await ext.runtime.sendMessage({ type: "media-best", src, pageUrl: location.href });
     } catch {
       /* extension reloaded */
     }
@@ -200,6 +200,7 @@
       res = await ext.runtime.sendMessage({
         type: "media-download-best",
         src: current.currentSrc || current.src || "",
+        pageUrl: location.href,
       });
     } catch {
       /* extension reloaded */

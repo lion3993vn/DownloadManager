@@ -224,3 +224,24 @@ pub fn open_url(app: AppHandle, url: String) -> CmdResult<()> {
     }
     app.opener().open_url(url, None::<&str>).map_err(err)
 }
+
+#[tauri::command]
+pub async fn media_tools_status(app: AppHandle) -> crate::media_tools::ToolsStatus {
+    crate::media_tools::status(&app).await
+}
+
+/// Download yt-dlp (+ ffmpeg on Windows). Progress: `dm://tools-progress`.
+#[tauri::command]
+pub async fn install_media_tools(app: AppHandle) -> CmdResult<crate::media_tools::ToolsStatus> {
+    crate::media_tools::install(&app).await
+}
+
+#[tauri::command]
+pub async fn update_media_tools(app: AppHandle) -> CmdResult<crate::media_tools::ToolsStatus> {
+    crate::media_tools::update(&app).await
+}
+
+#[tauri::command]
+pub fn remove_media_tools(app: AppHandle) -> CmdResult<()> {
+    crate::media_tools::remove(&app)
+}

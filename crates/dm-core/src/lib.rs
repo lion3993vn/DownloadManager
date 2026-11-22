@@ -14,6 +14,7 @@ mod engine;
 mod error;
 mod hls;
 mod http;
+mod media;
 pub mod naming;
 mod planner;
 mod rate_limit;
@@ -24,5 +25,6 @@ mod types;
 
 pub use engine::Engine;
 pub use error::{Error, Result};
+pub use media::{MediaTools, DEFAULT_QUALITY as DEFAULT_MEDIA_QUALITY};
 pub use planner::plan_segments;
 pub use types::*;
