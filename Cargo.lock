@@ -1001,7 +1001,7 @@ dependencies = [
 
 [[package]]
 name = "dm-cli"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "dm-core",
  "tokio",
@@ -1009,7 +1009,7 @@ dependencies = [
 
 [[package]]
 name = "dm-core"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "aes",
  "axum",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "download-manager"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "axum",
  "dm-core",
