@@ -44,6 +44,22 @@ function mediaPathExt(url) {
   }
 }
 
+/**
+ * Sites whose feeds preload the videos before and after the one on screen, so
+ * a stream seen on the network is often not the one the user means (TikTok's
+ * are also HEVC, which Windows cannot play). Their videos go through the page
+ * URL and yt-dlp instead.
+ */
+const MEDIA_FEED_SITES = /(^|\.)(tiktok\.com|instagram\.com)$/i;
+
+function mediaFromFeedSite(pageUrl) {
+  try {
+    return MEDIA_FEED_SITES.test(new URL(pageUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** -> "hls" | "video" | "audio" | null */
 function mediaClassify(url, mime) {
   const ext = mediaPathExt(url);
@@ -276,6 +292,7 @@ if (ext.webRequest) {
       mediaReferers.delete(d.requestId);
       if (d.tabId < 0 || (d.statusCode !== 200 && d.statusCode !== 206)) return;
       if (!/^https?:/i.test(d.url)) return;
+      if (mediaFromFeedSite(d.documentUrl || d.initiator || "")) return;
       const mime = mediaHeader(d.responseHeaders, "content-type");
       const type = mediaClassify(d.url, mime);
       if (!type) return;
@@ -457,12 +474,36 @@ async function mediaTabUrl(tabId) {
   }
 }
 
+/** The first candidate URL that is a video page. */
+function mediaFirstPage(urls) {
+  for (const u of urls || []) {
+    const page = mediaPageItem(u);
+    if (page) return page;
+  }
+  return null;
+}
+
+/**
+ * The video page for a tab: its URL, or, on feeds whose URL does not change
+ * per video (TikTok "For You"…), the video on screen as content.js sees it.
+ */
+async function mediaTabPage(tabId) {
+  const page = mediaPageItem(await mediaTabUrl(tabId));
+  if (page) return page;
+  try {
+    const urls = await ext.tabs.sendMessage(tabId, { type: "dm-current-video" }, { frameId: 0 });
+    return mediaFirstPage(urls);
+  } catch {
+    return null; // no content script (browser pages, not yet loaded)
+  }
+}
+
 ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handlers = {
     // Popup: everything found in a tab (the page itself first on video sites).
     "media-list": async () => {
       const items = mediaVisible(await mediaLoad(msg.tabId));
-      const page = mediaPageItem(await mediaTabUrl(msg.tabId));
+      const page = await mediaTabPage(msg.tabId);
       return [...(page ? [page] : []), ...items].map((i) => ({
         ...i,
         label: mediaLabel(i),
@@ -473,7 +514,7 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     "media-download": async () => {
       const item =
         msg.id === "page"
-          ? mediaPageItem(await mediaTabUrl(msg.tabId))
+          ? await mediaTabPage(msg.tabId)
           : (await mediaLoad(msg.tabId)).find((i) => i.id === msg.id);
       return item ? mediaSend(msg.tabId, item) : { ok: false, error: "Không còn thấy video này" };
     },
@@ -481,12 +522,12 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     "media-best": async () => {
       const prefs = await dmSettings();
       if (!prefs.showVideoButton || !sender.tab) return null;
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pageUrl);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages);
       return item ? { label: mediaLabel(item) } : null;
     },
     "media-download-best": async () => {
       if (!sender.tab) return { ok: false };
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pageUrl);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages);
       if (!item) return { ok: false, error: "Không tìm thấy luồng tải được" };
       return mediaSend(sender.tab.id, item);
     },
@@ -498,13 +539,17 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /**
- * On a video page (or an embedded player from one) the page URL wins: the app
- * fetches it with yt-dlp. Otherwise a direct http(s) src, else the best stream
- * seen in the frame (blob: sources from streaming players).
+ * A video page wins: the app fetches it with yt-dlp. `pages` are candidate
+ * URLs from content.js, most specific first (the TikTok post holding the
+ * video, the frame's URL, links in the post). Otherwise a direct http(s) src,
+ * else the best stream seen in the frame (blob: sources from streaming
+ * players). On feed sites nothing is better than a neighbouring video.
  */
-async function mediaForElement(tabId, frameId, src, pageUrl) {
-  const page = mediaPageItem(pageUrl);
+async function mediaForElement(tabId, frameId, src, pages) {
+  const urls = Array.isArray(pages) ? pages : [pages];
+  const page = mediaFirstPage(urls);
   if (page) return page;
+  if (mediaFromFeedSite(urls[0])) return null;
   const items = await mediaLoad(tabId);
   if (src && /^https?:/i.test(src)) {
     const known = items.find((i) => i.url === src);

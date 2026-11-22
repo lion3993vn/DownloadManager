@@ -106,13 +106,77 @@
     return null;
   }
 
+  /**
+   * URLs that may be the page of this video, most specific first. Feeds
+   * (TikTok "For You", Instagram, YouTube's home page) keep one URL for many
+   * videos, so the post around the video says which one it is. The extension
+   * keeps the first one that is a known video page.
+   */
+  function pageCandidates(video) {
+    // The post: the largest ancestor that holds this video and no other.
+    let box = video;
+    for (let i = 0; i < 15; i++) {
+      const up = box.parentElement;
+      if (!up || up === document.body || up.getElementsByTagName("video").length > 1) break;
+      box = up;
+    }
+    const links = [...box.querySelectorAll("a[href]")].map((a) => a.href).slice(0, 40);
+    const out = [];
+    // TikTok's player sits in <div id="xgwrapper-0-<video id>">. yt-dlp
+    // accepts any user name with the id.
+    for (let el = video; el && el !== box.parentElement; el = el.parentElement) {
+      const m = /^xgwrapper-\d+-(\d{8,})$/.exec(el.id || "");
+      if (m) {
+        const author = links.map((h) => /tiktok\.com\/@([\w.-]+)/.exec(h)).find(Boolean);
+        out.push(`https://www.tiktok.com/@${author ? author[1] : "_"}/video/${m[1]}`);
+        break;
+      }
+    }
+    out.push(location.href, ...links);
+    return out;
+  }
+
+  /** The video the user is most likely looking at: largest on screen. */
+  function mainVideo() {
+    let best = null;
+    let bestArea = 0;
+    for (const v of videos) {
+      const r = v.getBoundingClientRect();
+      const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0);
+      const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+      if (w < MIN_W / 2 || h < MIN_H / 2) continue;
+      if (w * h > bestArea) {
+        best = v;
+        bestArea = w * h;
+      }
+    }
+    return best;
+  }
+
+  // Popup and context menu: which video page is this frame showing?
+  let contextVideo = null;
+  document.addEventListener(
+    "contextmenu",
+    (e) => {
+      contextVideo = e.target instanceof HTMLVideoElement ? e.target : videoAt(e.clientX, e.clientY);
+    },
+    true,
+  );
+  ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.type !== "dm-current-video") return false;
+    const v = (contextVideo && contextVideo.isConnected && contextVideo) || mainVideo();
+    contextVideo = null;
+    sendResponse(v ? pageCandidates(v) : [location.href]);
+    return false;
+  });
+
   async function lookup(video) {
     const src = video.currentSrc || video.src || "";
     const hit = cache.get(video);
     if (hit && hit.src === src && Date.now() - hit.at < 4000) return hit.result;
     let result = null;
     try {
-      result = await ext.runtime.sendMessage({ type: "media-best", src, pageUrl: location.href });
+      result = await ext.runtime.sendMessage({ type: "media-best", src, pages: pageCandidates(video) });
     } catch {
       /* extension reloaded */
     }
@@ -200,7 +264,7 @@
       res = await ext.runtime.sendMessage({
         type: "media-download-best",
         src: current.currentSrc || current.src || "",
-        pageUrl: location.href,
+        pages: pageCandidates(current),
       });
     } catch {
       /* extension reloaded */

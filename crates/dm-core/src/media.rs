@@ -73,14 +73,29 @@ pub(crate) fn is_media_site(url: &str) -> bool {
     let Some(host) = u.host_str().map(str::to_ascii_lowercase) else {
         return false;
     };
-    SITES
+    // Only the site itself and its page subdomains: CDN hosts such as
+    // `v16-webapp-prime.tiktok.com` serve raw files, which yt-dlp would just
+    // copy (TikTok's are often HEVC).
+    let host = PAGE_PREFIXES
         .iter()
-        .any(|s| host == *s || host.ends_with(&format!(".{s}")))
+        .find_map(|p| host.strip_prefix(p).filter(|rest| SITES.contains(rest)))
+        .unwrap_or(host.as_str());
+    SITES.contains(&host)
 }
+
+/// Subdomains that serve pages (and short links), not media files.
+const PAGE_PREFIXES: &[&str] = &[
+    "www.", "m.", "mobile.", "web.", "music.", "vm.", "vt.", "player.", "clips.", "gaming.",
+];
 
 // ---------------------------------------------------------------------------
 // Formats and names
 // ---------------------------------------------------------------------------
+
+/// Format filter dropping HEVC (TikTok's `bytevc1`): Windows only plays it
+/// with a paid codec pack, so the file would have sound but no picture.
+/// `?` keeps formats whose codec is unknown.
+const NO_HEVC: &str = "[vcodec!*=?hev][vcodec!*=?hvc][vcodec!*=?265][vcodec!*=?bytevc1]";
 
 /// yt-dlp arguments for a quality, and the extension the result will have.
 fn format_args(quality: &str, has_ffmpeg: bool) -> (Vec<String>, &'static str) {
@@ -111,15 +126,21 @@ fn format_args(quality: &str, has_ffmpeg: bool) -> (Vec<String>, &'static str) {
             Some(h) => format!("res:{h},vcodec:h264,acodec:aac"),
             None => "res,vcodec:h264,acodec:aac".to_string(),
         };
-        let mut a = s(&["-f", "bv*+ba/b", "-S"]);
+        // Non-HLS first: with YouTube's DASH formats yt-dlp knows the size and
+        // fetches range chunks in parallel (`-N`); HLS has neither. HEVC only
+        // when nothing else exists (TikTok offers it at a higher resolution).
+        let f = format!("bv*[protocol!*=m3u8]{NO_HEVC}+ba/bv*{NO_HEVC}+ba/bv*+ba/b");
+        let mut a = vec!["-f".to_string(), f, "-S".to_string()];
         a.push(sort);
         a.extend(s(&["--merge-output-format", "mp4"]));
         (a, "mp4")
     } else {
         // Only files that already contain both.
         let f = match height {
-            Some(h) => format!("b[height<={h}][ext=mp4]/b[height<={h}]/b"),
-            None => "b[ext=mp4]/b".to_string(),
+            Some(h) => {
+                format!("b[height<={h}][ext=mp4]{NO_HEVC}/b[height<={h}]{NO_HEVC}/b[height<={h}]/b")
+            }
+            None => format!("b[ext=mp4]{NO_HEVC}/b{NO_HEVC}/b"),
         };
         (vec!["-f".into(), f], "mp4")
     }
@@ -273,6 +294,18 @@ fn describe(info: &Value, has_ffmpeg: bool) -> MediaInfo {
 }
 
 /// Size of what `-J -f …` selected (video + audio when merged).
+/// Whether yt-dlp fetches the chosen formats as fragments, which `-N`
+/// downloads in parallel (plain HTTPS formats use one connection).
+fn fragmented(info: &Value) -> bool {
+    let parts = match info.get("requested_formats").and_then(Value::as_array) {
+        Some(parts) if !parts.is_empty() => parts.iter().collect::<Vec<_>>(),
+        _ => vec![info],
+    };
+    parts
+        .iter()
+        .any(|f| str_of(f, "protocol").is_some_and(|p| p.contains("dash") || p.contains("m3u8")))
+}
+
 fn selected_size(info: &Value) -> Option<u64> {
     match info.get("requested_formats").and_then(Value::as_array) {
         Some(parts) if !parts.is_empty() => parts.iter().map(size_of).sum(),
@@ -292,7 +325,10 @@ fn command(tools: &MediaTools, headers: &RequestHeaders) -> Command {
         .kill_on_drop(true)
         // Titles are often not ASCII; never let Python pick the console code page.
         .env("PYTHONIOENCODING", "utf-8")
-        .args(["--encoding", "utf-8", "--no-playlist", "--no-colors"]);
+        .args(["--encoding", "utf-8", "--no-playlist", "--no-colors"])
+        // Serve YouTube's plain HTTPS formats as range fragments, so `-N`
+        // downloads them over several connections (one otherwise).
+        .args(["--extractor-args", "youtube:formats=dashy"]);
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -306,16 +342,48 @@ fn command(tools: &MediaTools, headers: &RequestHeaders) -> Command {
     if let Some(ffmpeg) = &tools.ffmpeg {
         c.arg("--ffmpeg-location").arg(ffmpeg);
     }
-    if let Some(ua) = headers.user_agent.as_deref().filter(|s| !s.is_empty()) {
-        c.args(["--user-agent", ua]);
-    }
     if let Some(r) = headers.referrer.as_deref().filter(|s| !s.is_empty()) {
         c.args(["--referer", r]);
     }
+    // Browser cookies go with the browser's User-Agent: some sites tie them together.
     if let Some(ck) = headers.cookies.as_deref().filter(|s| !s.is_empty()) {
+        if let Some(ua) = headers.user_agent.as_deref().filter(|s| !s.is_empty()) {
+            c.args(["--user-agent", ua]);
+        }
         c.arg("--add-header").arg(format!("Cookie:{ck}"));
     }
     c
+}
+
+/// Extract with as little of the browser as works, and return the headers to
+/// download with. yt-dlp picks its own client and User-Agent per site; YouTube
+/// cookies from a signed-in browser make it fail with "Video unavailable". So
+/// the browser's cookies (and User-Agent) are only tried when the plain attempt
+/// fails, for pages that need a login.
+async fn extract(
+    tools: &MediaTools,
+    url: &str,
+    headers: &RequestHeaders,
+    format: &[String],
+    token: &CancellationToken,
+) -> Result<Option<(Value, RequestHeaders)>> {
+    let plain = RequestHeaders {
+        referrer: headers.referrer.clone(),
+        user_agent: None,
+        cookies: None,
+    };
+    let first = dump_json(tools, url, &plain, format, token).await;
+    let has_cookies = headers.cookies.as_deref().is_some_and(|c| !c.is_empty());
+    match first {
+        Err(e) if has_cookies && !matches!(e, Error::Timeout) => {
+            match dump_json(tools, url, headers, format, token).await {
+                Ok(v) => Ok(v.map(|v| (v, headers.clone()))),
+                // The first error is the one about the video itself.
+                Err(_) => Err(e),
+            }
+        }
+        r => Ok(r?.map(|v| (v, plain))),
+    }
 }
 
 /// Stop yt-dlp and everything it started. The standalone yt-dlp binaries
@@ -420,7 +488,7 @@ pub(crate) async fn probe(
     url: &str,
     headers: &RequestHeaders,
 ) -> Result<ProbeResult> {
-    let info = dump_json(tools, url, headers, &[], &CancellationToken::new())
+    let (info, _) = extract(tools, url, headers, &[], &CancellationToken::new())
         .await?
         .expect("not cancelled");
     let media = describe(&info, tools.ffmpeg.is_some());
@@ -507,7 +575,8 @@ pub(crate) async fn run(
     let (format, ext) = format_args(&quality, tools.ffmpeg.is_some());
 
     // 1. Extract (also refreshes stream URLs, which expire after a few hours).
-    let Some(meta) = dump_json(&tools, &info.url, &info.headers, &format, &token).await? else {
+    let Some((meta, headers)) = extract(&tools, &info.url, &info.headers, &format, &token).await?
+    else {
         return Ok(Outcome::Stopped);
     };
     if meta.get("is_live").and_then(Value::as_bool) == Some(true) {
@@ -538,6 +607,11 @@ pub(crate) async fn run(
     let info_path = dir.join(INFO_FILE);
     std::fs::write(&info_path, meta.to_string())?;
     let estimate = selected_size(&meta);
+    let connections = if fragmented(&meta) {
+        info.connections.clamp(1, 16)
+    } else {
+        1
+    };
     info.kind = DownloadKind::Media;
     info.media_quality = Some(quality);
     info.resumable = true;
@@ -546,7 +620,7 @@ pub(crate) async fn run(
     inner.commit(&info);
 
     // 3. Download.
-    let mut cmd = command(&tools, &info.headers);
+    let mut cmd = command(&tools, &headers);
     cmd.args(&format)
         .arg("--load-info-json")
         .arg(&info_path)
@@ -554,7 +628,7 @@ pub(crate) async fn run(
         .arg(dir.join(OUTPUT))
         .args(["--newline", "--progress", "--continue", "--no-mtime"])
         .args(["--retries", "10", "--fragment-retries", "10"])
-        .args(["-N", &info.connections.clamp(1, 16).to_string()])
+        .args(["-N", &connections.to_string()])
         .args(speed_limit_args(inner.settings().speed_limit))
         .args([
             "--progress-template",
@@ -624,7 +698,7 @@ pub(crate) async fn run(
                     eta_secs: total
                         .filter(|_| speed > 1.0)
                         .map(|t| (t.saturating_sub(received) as f64 / speed).ceil() as u64),
-                    active_connections: 1,
+                    active_connections: connections,
                     segments: total.map_or_else(Vec::new, |t| vec![SegmentInfo { start: 0, end: t, done: received.min(t) }]),
                 });
                 if last_persist.elapsed() >= transfer::PERSIST_INTERVAL {
@@ -731,6 +805,18 @@ mod tests {
         assert!(is_media_site("https://www.tiktok.com/@a/video/1"));
         assert!(!is_media_site("https://notyoutube.com/watch"));
         assert!(!is_media_site("https://example.com/video.mp4"));
+        assert!(is_media_site("https://vm.tiktok.com/ZMabc/"));
+        assert!(is_media_site("https://player.vimeo.com/video/1"));
+        // CDN hosts serve raw files, not pages.
+        assert!(!is_media_site(
+            "https://v16-webapp-prime.tiktok.com/video/tos/alisg/x/"
+        ));
+        assert!(!is_media_site(
+            "https://rr3---sn-8qj-i5o6.googlevideo.com/videoplayback"
+        ));
+        assert!(!is_media_site(
+            "https://video.fsgn5-1.fna.fbcdn.net/v/t42.mp4"
+        ));
     }
 
     #[test]
@@ -742,11 +828,23 @@ mod tests {
     }
 
     #[test]
+    fn fragmented_formats_use_several_connections() {
+        let dash = json!({"requested_formats": [
+            {"protocol": "http_dash_segments"}, {"protocol": "https"}
+        ]});
+        assert!(fragmented(&dash));
+        assert!(!fragmented(&json!({"protocol": "https"})));
+        assert!(fragmented(&json!({"protocol": "m3u8_native"})));
+    }
+
+    #[test]
     fn format_selection() {
         let (a, ext) = format_args("720", true);
         assert_eq!(ext, "mp4");
         assert!(a.contains(&"res:720,vcodec:h264,acodec:aac".to_string()));
         assert!(a.contains(&"--merge-output-format".to_string()));
+        assert!(a[1].starts_with("bv*[protocol!*=m3u8][vcodec!*=?hev]"));
+        assert!(a[1].ends_with("+ba/bv*+ba/b"));
         let (a, ext) = format_args("audio", true);
         assert_eq!(ext, "mp3");
         assert!(a.contains(&"-x".to_string()));
@@ -754,7 +852,8 @@ mod tests {
         assert_eq!(ext, "m4a");
         assert!(!a.contains(&"-x".to_string()));
         let (a, _) = format_args("1080", false);
-        assert_eq!(a[1], "b[height<=1080][ext=mp4]/b[height<=1080]/b");
+        assert!(a[1].starts_with("b[height<=1080][ext=mp4][vcodec!*=?hev]"));
+        assert!(a[1].ends_with("/b[height<=1080]/b"));
         let (a, _) = format_args("best", true);
         assert!(a.contains(&"res,vcodec:h264,acodec:aac".to_string()));
     }

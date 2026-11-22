@@ -200,7 +200,15 @@ ext.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   // Streaming players play from blob: URLs; use the stream found on the page.
   if (url && /^blob:/i.test(url) && tab && /^(video|audio)$/.test(info.mediaType || "")) {
-    const item = await mediaForElement(tab.id, info.frameId ?? 0, null, info.frameUrl || info.pageUrl);
+    // content.js knows which post the right-clicked video belongs to.
+    let pages = [info.frameUrl || info.pageUrl];
+    try {
+      const found = await ext.tabs.sendMessage(tab.id, { type: "dm-current-video" }, { frameId: info.frameId ?? 0 });
+      if (Array.isArray(found) && found.length) pages = found;
+    } catch {
+      /* no content script in that frame */
+    }
+    const item = await mediaForElement(tab.id, info.frameId ?? 0, null, pages);
     if (item) mediaSend(tab.id, item);
     else flashBadge("!", "#dc2626", tab.id);
     return;

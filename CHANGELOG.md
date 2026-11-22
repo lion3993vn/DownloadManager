@@ -6,6 +6,14 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### 🔧 Cải tiến
+- Video YouTube tải bằng **nhiều luồng song song** (theo số kết nối đã chọn), nhanh hơn gần gấp đôi.
+- Video được chọn ở định dạng H.264 khi có, để mở được bằng Media Player của Windows mà không cần mua codec HEVC.
+
+### 🐛 Sửa lỗi
+- Bấm "Gửi sang app" trên YouTube báo *"Video không còn hoặc không xem được"*, trong khi dán link thì tải được. Nguyên nhân là cookie đăng nhập của trình duyệt; giờ app chỉ dùng cookie khi trang yêu cầu đăng nhập.
+- TikTok: nút tải trên trang For You tải nhầm video phía trước hoặc phía sau, và tệp tải về chỉ có tiếng. Giờ extension tải đúng video đang xem, qua link của video đó.
+
 ## [0.4.1] - 2026-11-22
 
 ### ✨ Tính năng mới

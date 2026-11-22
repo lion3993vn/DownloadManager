@@ -27,7 +27,7 @@ const CONNECTION_CHOICES = [1, 2, 4, 8, 16, 32];
 
 /** Sites whose links are video pages (probing them runs yt-dlp, which takes a few seconds). */
 const VIDEO_SITE =
-  /^https?:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|tiktok\.com|facebook\.com|fb\.watch|instagram\.com|x\.com|twitter\.com|vimeo\.com|dailymotion\.com|soundcloud\.com|bilibili\.com|twitch\.tv)\//i;
+  /^https?:\/\/((www|m|mobile|web|music|vm|vt|player|clips|gaming)\.)?(youtube\.com|youtu\.be|tiktok\.com|facebook\.com|fb\.watch|instagram\.com|x\.com|twitter\.com|vimeo\.com|dailymotion\.com|soundcloud\.com|bilibili\.com|twitch\.tv)\//i;
 
 /** yt-dlp extractor names -> how people write them. */
 const SITE_NAMES: Record<string, string> = { Youtube: "YouTube", YoutubeTab: "YouTube", Twitter: "X", TikTok: "TikTok", Facebook: "Facebook", Instagram: "Instagram", Vimeo: "Vimeo", Dailymotion: "Dailymotion", Soundcloud: "SoundCloud", BiliBili: "Bilibili", TwitchVod: "Twitch", TwitchClips: "Twitch" };

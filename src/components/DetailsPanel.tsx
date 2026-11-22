@@ -122,7 +122,10 @@ export function DetailsPanel({ row: r, ...a }: Props) {
           )}
           <InfoRow label="Kết nối">
             {r.kind === "media"
-              ? "Hỗ trợ tạm dừng"
+              ? // yt-dlp only splits some formats (YouTube's); the live count says.
+                r.status === "downloading" && r.activeConnections > 0
+                ? `${r.activeConnections} luồng · hỗ trợ tạm dừng`
+                : "Hỗ trợ tạm dừng"
               : r.kind === "hls"
               ? `${r.connections} luồng · hỗ trợ tạm dừng`
               : r.totalSize == null && r.downloaded === 0 && r.status !== "completed"
