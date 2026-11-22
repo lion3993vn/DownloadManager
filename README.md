@@ -100,9 +100,11 @@ Bản cập nhật được ký bằng minisign và app chỉ cài bản có ch�
 
    Các app đang chạy sẽ thấy bản mới trong vòng 6 giờ, hoặc ngay khi khởi động lại.
 
+Hướng dẫn đầy đủ (chọn số phiên bản, việc cần kiểm tra trước khi phát hành, theo dõi CI, xử lý sự cố): [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Giới hạn hiện tại
 
-- Chưa bắt video stream (HLS/DASH m3u8), chưa hỗ trợ FTP/BitTorrent.
+- Chưa hỗ trợ: danh sách phát và luồng phát trực tiếp trên các trang video, HLS tách riêng tiếng/hình khi không qua yt-dlp, video có DRM, FTP/BitTorrent.
 - Không bắt download trong cửa sổ ẩn danh.
 - Firefox chỉ cài được extension dạng tạm thời (tự gỡ khi đóng Firefox) cho tới khi extension được Mozilla ký.
 - Tải theo kiểu một luồng (máy chủ không hỗ trợ Range) không tạm dừng/tiếp tục được — tiếp tục sẽ tải lại từ đầu.
