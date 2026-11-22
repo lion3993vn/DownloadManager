@@ -444,6 +444,7 @@ function mediaLabel(item) {
   if (item.type === "hls") parts.push("HLS");
   else parts.push(mediaExtFor(item).toUpperCase());
   if (item.resolution) parts.push(`${Math.min(item.resolution[0], item.resolution[1])}p`);
+  if (item.hevc) parts.push("HEVC");
   return parts.join(" ");
 }
 
@@ -461,7 +462,7 @@ async function mediaSend(tabId, item) {
     // The app asks yt-dlp for the title and lets the user pick a quality.
     ok = await sendToApp(s, { url: item.url, referrer: null, kind: "media" });
   } else {
-    const title = mediaCleanTitle(tab && tab.title);
+    const title = mediaCleanTitle(item.title) || mediaCleanTitle(tab && tab.title);
     const base = title || mediaCleanTitle(mediaUrlName(item.url).replace(/\.[a-z0-9]+$/i, "")) || "video";
     ok = await sendToApp(s, {
       url: item.url,
@@ -498,14 +499,35 @@ function mediaFirstPage(urls) {
  * per video (TikTok "For You"…), the video on screen as content.js sees it.
  */
 async function mediaTabPage(tabId) {
-  const page = mediaPageItem(await mediaTabUrl(tabId));
-  if (page) return page;
+  let found = null;
   try {
-    const urls = await ext.tabs.sendMessage(tabId, { type: "dm-current-video" }, { frameId: 0 });
-    return mediaFirstPage(urls);
+    found = await ext.tabs.sendMessage(tabId, { type: "dm-current-video" }, { frameId: 0 });
   } catch {
-    return null; // no content script (browser pages, not yet loaded)
+    /* no content script (browser pages, not yet loaded) */
   }
+  const direct = mediaDirectItem(found && found.direct, 0);
+  if (direct) return direct;
+  return mediaPageItem(await mediaTabUrl(tabId)) || mediaFirstPage(found && found.pages);
+}
+
+/**
+ * A stream link content.js read from the page (Douyin, see douyin-hook.js):
+ * downloaded directly, because yt-dlp cannot fetch these sites.
+ */
+function mediaDirectItem(d, frameId) {
+  if (!d || typeof d.url !== "string" || !/^https:\/\//.test(d.url)) return null;
+  return {
+    id: "page",
+    url: d.url,
+    type: "video",
+    mime: "video/mp4",
+    size: Number(d.size) || null,
+    resolution: d.width && d.height ? [d.width, d.height] : null,
+    title: d.title || null,
+    hevc: !!d.hevc,
+    referrer: "https://www.douyin.com/",
+    frameId,
+  };
 }
 
 ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -532,12 +554,12 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     "media-best": async () => {
       const prefs = await dmSettings();
       if (!prefs.showVideoButton || !sender.tab) return null;
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages, msg.direct);
       return item ? { label: mediaLabel(item) } : null;
     },
     "media-download-best": async () => {
       if (!sender.tab) return { ok: false };
-      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages);
+      const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages, msg.direct);
       if (!item) return { ok: false, error: "Không tìm thấy luồng tải được" };
       return mediaSend(sender.tab.id, item);
     },
@@ -555,7 +577,9 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
  * else the best stream seen in the frame (blob: sources from streaming
  * players). On feed sites nothing is better than a neighbouring video.
  */
-async function mediaForElement(tabId, frameId, src, pages) {
+async function mediaForElement(tabId, frameId, src, pages, direct) {
+  const own = mediaDirectItem(direct, frameId);
+  if (own) return own;
   const urls = Array.isArray(pages) ? pages : [pages];
   const page = mediaFirstPage(urls);
   if (page) return page;

@@ -6,6 +6,9 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### 🐛 Sửa lỗi
+- **Douyin tải được thật.** Bản 0.4.3 báo *"Trang này cần cookie…"*, kể cả khi gửi từ extension, vì Douyin chặn yt-dlp. Giờ extension lấy link video H.264 ngay từ trang Douyin đang mở, và app tải link đó bằng nhiều luồng. Video mở được ngay bằng Media Player. Cách dùng: mở video trên douyin.com, đợi video phát, rồi bấm nút **Tải video** trên video hoặc "Gửi sang app" trong popup.
+
 ## [0.4.3] - 2026-11-22
 
 ### ✨ Tính năng mới

@@ -202,13 +202,15 @@ ext.contextMenus.onClicked.addListener(async (info, tab) => {
   if (url && /^blob:/i.test(url) && tab && /^(video|audio)$/.test(info.mediaType || "")) {
     // content.js knows which post the right-clicked video belongs to.
     let pages = [info.frameUrl || info.pageUrl];
+    let direct = null;
     try {
       const found = await ext.tabs.sendMessage(tab.id, { type: "dm-current-video" }, { frameId: info.frameId ?? 0 });
-      if (Array.isArray(found) && found.length) pages = found;
+      if (found && Array.isArray(found.pages) && found.pages.length) pages = found.pages;
+      direct = (found && found.direct) || null;
     } catch {
       /* no content script in that frame */
     }
-    const item = await mediaForElement(tab.id, info.frameId ?? 0, null, pages);
+    const item = await mediaForElement(tab.id, info.frameId ?? 0, null, pages, direct);
     if (item) mediaSend(tab.id, item);
     else flashBadge("!", "#dc2626", tab.id);
     return;

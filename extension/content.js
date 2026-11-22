@@ -106,21 +106,99 @@
     return null;
   }
 
-  /**
-   * URLs that may be the page of this video, most specific first. Feeds
-   * (TikTok "For You", Instagram, YouTube's home page) keep one URL for many
-   * videos, so the post around the video says which one it is. The extension
-   * keeps the first one that is a known video page.
-   */
-  function pageCandidates(video) {
-    // The post: the largest ancestor that holds this video and no other.
+  // ---------- Douyin: stream links read by douyin-hook.js ----------
+  // yt-dlp cannot fetch Douyin, so its videos are sent as direct H.264 links
+  // taken from the API answers the page already received.
+  const onDouyin = /(^|\.)douyin\.com$/.test(location.hostname);
+  const douyin = new Map(); // aweme id -> { id, title, url, size, width, height, hevc, keys }
+
+  /** Same as douyinKey in douyin-hook.js: the file id in a stream URL. */
+  function dmDouyinKey(u) {
+    try {
+      const url = new URL(u, location.href);
+      const vid = url.searchParams.get("video_id");
+      if (vid) return vid;
+      const parts = url.pathname.split("/").filter(Boolean);
+      const i = parts.indexOf("video");
+      return i >= 0 && parts.length > i + 1 ? parts[parts.length - 1] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (onDouyin) {
+    window.addEventListener("message", (e) => {
+      if (e.source !== window || !e.data || e.data.__dm !== "douyin-videos" || !Array.isArray(e.data.videos)) return;
+      for (const v of e.data.videos) {
+        // The page is not trusted: keep only well-formed entries.
+        if (!v || !/^\d{6,25}$/.test(String(v.id)) || !/^https:\/\//.test(String(v.url))) continue;
+        douyin.delete(v.id);
+        douyin.set(String(v.id), {
+          id: String(v.id),
+          title: String(v.title || v.id).slice(0, 200),
+          url: String(v.url),
+          size: Number(v.size) || 0,
+          width: Number(v.width) || 0,
+          height: Number(v.height) || 0,
+          hevc: !!v.hevc,
+          keys: Array.isArray(v.keys) ? v.keys.map(String).slice(0, 30) : [],
+        });
+      }
+      while (douyin.size > 300) douyin.delete(douyin.keys().next().value);
+    });
+    window.postMessage({ __dm: "douyin-sync" }, location.origin);
+  }
+
+  /** The Douyin post a <video> element shows, or null when unsure. */
+  function douyinFor(video, box, links) {
+    if (!onDouyin || !douyin.size) return null;
+    // 1. The file it plays (direct douyinvod.com sources).
+    const srcs = [video.currentSrc, video.src, ...[...video.querySelectorAll("source")].map((s) => s.src)];
+    for (const s of srcs) {
+      const k = s && /^https?:/.test(s) ? dmDouyinKey(s) : null;
+      if (!k) continue;
+      for (const v of douyin.values()) if (v.keys.includes(k)) return v;
+    }
+    // 2. A video id: the player's data-e2e-vid, the URL, links in the post.
+    const ids = [];
+    for (let el = video; el && el !== box.parentElement; el = el.parentElement) {
+      const vid = el.getAttribute && el.getAttribute("data-e2e-vid");
+      if (vid) ids.push(vid);
+    }
+    const fromUrl = /[?&]modal_id=(\d+)|\/video\/(\d+)/.exec(location.href);
+    if (fromUrl) ids.push(fromUrl[1] || fromUrl[2]);
+    for (const h of links) {
+      const m = /douyin\.com\/video\/(\d+)/.exec(h);
+      if (m) ids.push(m[1]);
+    }
+    for (const id of ids) if (douyin.has(id)) return douyin.get(id);
+    return null;
+  }
+
+  /** The post around a video (the largest ancestor holding no other video) and its links. */
+  function postOf(video) {
     let box = video;
     for (let i = 0; i < 15; i++) {
       const up = box.parentElement;
       if (!up || up === document.body || up.getElementsByTagName("video").length > 1) break;
       box = up;
     }
-    const links = [...box.querySelectorAll("a[href]")].map((a) => a.href).slice(0, 40);
+    return { box, links: [...box.querySelectorAll("a[href]")].map((a) => a.href).slice(0, 40) };
+  }
+
+  /** Everything the extension needs to pick what to download for a video. */
+  function describe(video) {
+    const { box, links } = postOf(video);
+    return { pages: pageCandidates(video, box, links), direct: douyinFor(video, box, links) };
+  }
+
+  /**
+   * URLs that may be the page of this video, most specific first. Feeds
+   * (TikTok "For You", Instagram, YouTube's home page) keep one URL for many
+   * videos, so the post around the video says which one it is. The extension
+   * keeps the first one that is a known video page.
+   */
+  function pageCandidates(video, box, links) {
     const out = [];
     // TikTok's player sits in <div id="xgwrapper-0-<video id>">. yt-dlp
     // accepts any user name with the id.
@@ -174,7 +252,7 @@
     if (msg?.type !== "dm-current-video") return false;
     const v = (contextVideo && contextVideo.isConnected && contextVideo) || mainVideo();
     contextVideo = null;
-    sendResponse(v ? pageCandidates(v) : [location.href]);
+    sendResponse(v ? describe(v) : { pages: [location.href], direct: null });
     return false;
   });
 
@@ -184,7 +262,7 @@
     if (hit && hit.src === src && Date.now() - hit.at < 4000) return hit.result;
     let result = null;
     try {
-      result = await ext.runtime.sendMessage({ type: "media-best", src, pages: pageCandidates(video) });
+      result = await ext.runtime.sendMessage({ type: "media-best", src, ...describe(video) });
     } catch {
       /* extension reloaded */
     }
@@ -272,7 +350,7 @@
       res = await ext.runtime.sendMessage({
         type: "media-download-best",
         src: current.currentSrc || current.src || "",
-        pages: pageCandidates(current),
+        ...describe(current),
       });
     } catch {
       /* extension reloaded */
