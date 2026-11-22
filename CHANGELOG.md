@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-22
+
 ### 🔧 Cải tiến
 - Video YouTube tải bằng **nhiều luồng song song** (theo số kết nối đã chọn), nhanh hơn gần gấp đôi.
 - Video được chọn ở định dạng H.264 khi có, để mở được bằng Media Player của Windows mà không cần mua codec HEVC.
@@ -112,7 +114,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.2
 [0.4.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.1
 [0.4.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.0
 [0.3.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.3.1
