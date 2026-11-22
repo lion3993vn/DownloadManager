@@ -29,6 +29,10 @@ export function DetailsPanel({ row: r, ...a }: Props) {
   const [copied, setCopied] = useState(false);
   const pct = r.status === "completed" ? 100 : r.totalSize ? Math.min(100, (r.downloaded / r.totalSize) * 100) : null;
   const sep = r.saveDir.includes("\\") ? "\\" : "/";
+  // Video (yt-dlp): one segment per fragment on disk, after the part already
+  // joined; only the fragments still downloading are connections.
+  const mapSegments =
+    r.kind === "media" ? r.liveSegments.filter((s) => s.done < s.end - s.start) : r.liveSegments;
 
   async function copyUrl() {
     await navigator.clipboard.writeText(r.url);
@@ -96,12 +100,15 @@ export function DetailsPanel({ row: r, ...a }: Props) {
           </button>
         </div>
 
-        {r.status !== "completed" && r.liveSegments.length > 1 && (
+        {r.status !== "completed" && mapSegments.length > 1 && (
           <section className="mt-5">
             <h4 className="mb-2 text-[12px] font-semibold text-ink-2">
-              Các luồng tải <span className="font-normal text-mute">({r.liveSegments.length} đoạn)</span>
+              Các luồng tải{" "}
+              <span className="font-normal text-mute">
+                ({mapSegments.length} {r.kind === "media" ? "đoạn đang tải" : "đoạn"})
+              </span>
             </h4>
-            <SegmentMap segments={r.liveSegments} status={r.status} />
+            <SegmentMap segments={mapSegments} status={r.status} />
           </section>
         )}
 

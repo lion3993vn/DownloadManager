@@ -50,7 +50,7 @@ function mediaPathExt(url) {
  * are also HEVC, which Windows cannot play). Their videos go through the page
  * URL and yt-dlp instead.
  */
-const MEDIA_FEED_SITES = /(^|\.)(tiktok\.com|instagram\.com)$/i;
+const MEDIA_FEED_SITES = /(^|\.)(tiktok\.com|douyin\.com|instagram\.com)$/i;
 
 function mediaFromFeedSite(pageUrl) {
   try {
@@ -405,6 +405,8 @@ function mediaPickBest(items, frameId) {
 const MEDIA_PAGES = [
   ["YouTube", /^https?:\/\/(www\.|m\.|music\.)?youtube\.com\/(watch\?|shorts\/|live\/|embed\/)|^https?:\/\/youtu\.be\/|^https?:\/\/(www\.)?youtube-nocookie\.com\/embed\//],
   ["TikTok", /^https?:\/\/(www\.|m\.)?tiktok\.com\/(@[^/]+\/video\/\d+|embed)/],
+  // The feed opens a video as ?modal_id=<id> on any page (see mediaCanonical).
+  ["Douyin", /^https?:\/\/(www\.)?douyin\.com\/(video\/\d+|[^#]*[?&]modal_id=\d+)/],
   ["Facebook", /^https?:\/\/(www\.|m\.|web\.)?facebook\.com\/(.+\/videos\/|watch\/?\?|reel\/|share\/[vr]\/)|^https?:\/\/fb\.watch\//],
   ["Instagram", /^https?:\/\/(www\.)?instagram\.com\/(p|reel|reels|tv)\//],
   ["X", /^https?:\/\/(www\.|mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/],
@@ -422,10 +424,18 @@ function mediaPageSite(url) {
   return hit ? hit[0] : null;
 }
 
+/** The URL yt-dlp understands for a video page. */
+function mediaCanonical(url) {
+  // Douyin: https://www.douyin.com/jingxuan?modal_id=123 -> /video/123
+  const modal = /^https?:\/\/(www\.)?douyin\.com\/[^#]*[?&]modal_id=(\d+)/.exec(url);
+  if (modal) return `https://www.douyin.com/video/${modal[2]}`;
+  return url.split("#")[0];
+}
+
 function mediaPageItem(url) {
   const site = mediaPageSite(url);
   if (!site) return null;
-  return { id: "page", url: url.split("#")[0], type: "page", site, frameId: null };
+  return { id: "page", url: mediaCanonical(url), type: "page", site, frameId: null };
 }
 
 function mediaLabel(item) {

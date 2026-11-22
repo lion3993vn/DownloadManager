@@ -79,3 +79,57 @@ async fn youtube_pause_stops_the_process_tree_and_resumes() {
     work.push(".d");
     assert!(!std::path::Path::new(&work).exists());
 }
+
+/// YouTube formats come as range fragments fetched in parallel; progress
+/// shows each fragment being downloaded as its own segment.
+#[tokio::test(flavor = "multi_thread")]
+async fn youtube_progress_shows_parallel_fragments() {
+    let Some(tools) = tools() else {
+        eprintln!("skipped: set DM_YTDLP to run");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::in_memory(settings(dir.path())).unwrap();
+    engine.set_media_tools(Some(tools));
+    let mut events = engine.subscribe();
+    let id = engine
+        .add(NewDownload {
+            url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ".into(),
+            media_quality: Some("1080".into()),
+            connections: Some(4),
+            ..Default::default()
+        })
+        .unwrap()
+        .id;
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+    let seen = loop {
+        match tokio::time::timeout_at(deadline, events.recv()).await {
+            Err(_) => panic!("no progress with several fragments in flight"),
+            Ok(Ok(dm_core::EngineEvent::Progress { progress })) if progress.id == id => {
+                let running = progress
+                    .segments
+                    .iter()
+                    .filter(|s| s.done < s.end - s.start)
+                    .count();
+                if running >= 2 {
+                    break progress;
+                }
+            }
+            Ok(_) => {}
+        }
+    };
+    assert_eq!(seen.active_connections, 4);
+    let total = seen.total_size.unwrap();
+    for w in seen.segments.windows(2) {
+        assert!(w[0].end <= w[1].start, "overlap: {:?}", seen.segments);
+    }
+    for s in &seen.segments {
+        assert!(
+            s.done <= s.end - s.start && s.end <= total,
+            "{s:?} of {total}"
+        );
+    }
+    engine.remove(id, true).unwrap();
+    wait_idle(&engine, id).await;
+}

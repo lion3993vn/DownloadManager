@@ -42,6 +42,7 @@ pub struct MediaTools {
 /// Quality used when none was chosen.
 pub const DEFAULT_QUALITY: &str = "1080";
 const INSPECT_TIMEOUT: Duration = Duration::from_secs(90);
+const TRANSCODE_TIMEOUT: Duration = Duration::from_secs(4 * 3600);
 const INFO_FILE: &str = "info.json";
 /// Output template inside the work folder: a fixed name so a resume finds
 /// yt-dlp's `.part` files again.
@@ -53,6 +54,7 @@ const SITES: &[&str] = &[
     "youtu.be",
     "youtube-nocookie.com",
     "tiktok.com",
+    "douyin.com",
     "facebook.com",
     "fb.watch",
     "instagram.com",
@@ -85,7 +87,7 @@ pub(crate) fn is_media_site(url: &str) -> bool {
 
 /// Subdomains that serve pages (and short links), not media files.
 const PAGE_PREFIXES: &[&str] = &[
-    "www.", "m.", "mobile.", "web.", "music.", "vm.", "vt.", "player.", "clips.", "gaming.",
+    "www.", "m.", "mobile.", "web.", "music.", "vm.", "vt.", "v.", "player.", "clips.", "gaming.",
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,23 @@ const PAGE_PREFIXES: &[&str] = &[
 /// with a paid codec pack, so the file would have sound but no picture.
 /// `?` keeps formats whose codec is unknown.
 const NO_HEVC: &str = "[vcodec!*=?hev][vcodec!*=?hvc][vcodec!*=?265][vcodec!*=?bytevc1]";
+
+/// HEVC under any of its names (`hev1`, `hvc1`, `h265`, TikTok/Douyin `bytevc1`).
+fn is_hevc(vcodec: &str) -> bool {
+    let v = vcodec.to_ascii_lowercase();
+    v.starts_with("hev") || v.starts_with("hvc") || v.contains("265") || v.contains("bytevc1")
+}
+
+/// Video codec of the format(s) yt-dlp chose.
+fn chosen_vcodec(info: &Value) -> Option<&str> {
+    let parts = info.get("requested_formats").and_then(Value::as_array);
+    parts
+        .into_iter()
+        .flatten()
+        .chain(std::iter::once(info))
+        .filter_map(|f| str_of(f, "vcodec"))
+        .find(|v| *v != "none")
+}
 
 /// yt-dlp arguments for a quality, and the extension the result will have.
 fn format_args(quality: &str, has_ffmpeg: bool) -> (Vec<String>, &'static str) {
@@ -522,6 +541,8 @@ struct Tick {
     downloaded: u64,
     total: Option<u64>,
     speed: f64,
+    /// Fragments in the current stream (`None` for a plain HTTPS stream).
+    fragments: Option<u32>,
 }
 
 fn parse_tick(line: &str) -> Option<Tick> {
@@ -534,16 +555,20 @@ fn parse_tick(line: &str) -> Option<Tick> {
     let total = num(it.next());
     let estimate = num(it.next());
     let speed = num(it.next()).unwrap_or(0.0);
+    let fragments = num(it.next()).map(|n| n as u32).filter(|&n| n > 0);
     Some(Tick {
         downloaded,
         total: total.or(estimate).map(|t| t as u64).filter(|&t| t > 0),
         speed,
+        fragments,
     })
 }
 
 /// Turns per-stream progress (video, then audio) into one running total.
 #[derive(Default)]
 struct Stages {
+    /// Which stream (0 = first) is downloading.
+    index: usize,
     base: u64,
     last_downloaded: u64,
     last_total: u64,
@@ -555,11 +580,127 @@ impl Stages {
         // A new stream starts from zero.
         if t.downloaded + (1 << 20) < self.last_downloaded {
             self.base += self.last_total.max(self.last_downloaded);
+            self.index += 1;
         }
         self.last_downloaded = t.downloaded;
         self.last_total = t.total.unwrap_or(t.downloaded).max(t.downloaded);
         (self.base + t.downloaded, self.base + self.last_total)
     }
+}
+
+/// Re-encode HEVC video to H.264 (audio copied) into `out`. Used on Windows
+/// when a site offers nothing but HEVC, which Windows only plays with a paid
+/// codec. `Ok(false)` when cancelled.
+async fn to_h264(
+    ffmpeg: &Path,
+    input: &Path,
+    out: &Path,
+    token: &CancellationToken,
+) -> Result<bool> {
+    let mut c = Command::new(ffmpeg);
+    c.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i"])
+        .arg(input)
+        .args([
+            "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast",
+        ])
+        .args([
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "copy",
+            "-movflags",
+            "+faststart",
+        ])
+        .arg(out);
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    match run_to_end(c, token, TRANSCODE_TIMEOUT).await {
+        Ok(Some(_)) => Ok(true),
+        // A half-written file must not be taken for the result on resume.
+        Ok(None) => {
+            let _ = std::fs::remove_file(out);
+            Ok(false)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(out);
+            Err(e)
+        }
+    }
+}
+
+/// yt-dlp splits YouTube "dashy" formats into 10 MiB byte ranges.
+const DASHY_CHUNK: u64 = 10 << 20;
+
+/// Per-fragment progress of the stream being downloaded, read from yt-dlp's
+/// files in the work folder: `…-FragN.part` while a fragment downloads,
+/// `…-FragN` once done, then appended to the stream's part file. yt-dlp only
+/// prints a total; this shows each connection like a normal download does.
+/// `base` is the size of the streams before this one (video before audio).
+fn fragment_segments(dir: &Path, base: u64, size: u64, count: u32) -> Option<Vec<SegmentInfo>> {
+    if count < 2 || size == 0 {
+        return None;
+    }
+    let n = u64::from(count);
+    let chunk = if size > (n - 1) * DASHY_CHUNK && size <= n * DASHY_CHUNK {
+        DASHY_CHUNK
+    } else {
+        size.div_ceil(n)
+    };
+    let range = |i: u64| {
+        let start = (i - 1) * chunk;
+        (start, chunk.min(size.saturating_sub(start)))
+    };
+    let mut frags = Vec::new(); // (fragment number from 1, bytes on disk)
+    for e in std::fs::read_dir(dir).ok()?.flatten() {
+        let name = e.file_name();
+        let Some((_, rest)) = name.to_str().and_then(|s| s.rsplit_once("-Frag")) else {
+            continue;
+        };
+        let (num, partial) = match rest.strip_suffix(".part") {
+            Some(num) => (num, true),
+            None => (rest, false),
+        };
+        let Some(i) = num.parse::<u64>().ok().filter(|i| (1..=n).contains(i)) else {
+            continue;
+        };
+        let len = range(i).1;
+        let done = if partial {
+            e.metadata().map_or(0, |m| m.len()).min(len)
+        } else {
+            len
+        };
+        frags.push((i, done));
+    }
+    frags.sort_unstable();
+    let first = frags.first()?.0;
+    // Everything before the first fragment file is already appended.
+    let appended = base + range(first).0;
+    let mut segs = Vec::with_capacity(frags.len() + 1);
+    if appended > 0 {
+        segs.push(SegmentInfo {
+            start: 0,
+            end: appended,
+            done: appended,
+        });
+    }
+    for (i, done) in frags {
+        let (start, len) = range(i);
+        segs.push(SegmentInfo {
+            start: base + start,
+            end: base + start + len,
+            done,
+        });
+    }
+    Some(segs)
 }
 
 pub(crate) async fn run(
@@ -632,7 +773,7 @@ pub(crate) async fn run(
         .args(speed_limit_args(inner.settings().speed_limit))
         .args([
             "--progress-template",
-            "download:[dm] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s",
+            "download:[dm] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s %(progress.fragment_count)s",
             "--print",
             "after_move:[dmfile] %(filepath)s",
         ]);
@@ -655,6 +796,12 @@ pub(crate) async fn run(
         })
     };
 
+    // Exact stream sizes (video, audio) place the fragments on the bar.
+    let stage_sizes: Vec<u64> = match meta.get("requested_formats").and_then(Value::as_array) {
+        Some(parts) if !parts.is_empty() => parts.iter().map(|f| size_of(f).unwrap_or(0)).collect(),
+        _ => vec![size_of(&meta).unwrap_or(0)],
+    };
+    let mut fragments: Option<u32> = None;
     let mut stages = Stages::default();
     let mut received = info.downloaded;
     let mut live_total = 0u64;
@@ -680,6 +827,7 @@ pub(crate) async fn run(
                         received = d;
                         live_total = total;
                         yt_speed = t.speed;
+                        fragments = t.fragments;
                     } else if let Some(p) = l.strip_prefix("[dmfile] ") {
                         final_file = Some(PathBuf::from(p.trim()));
                     }
@@ -699,7 +847,15 @@ pub(crate) async fn run(
                         .filter(|_| speed > 1.0)
                         .map(|t| (t.saturating_sub(received) as f64 / speed).ceil() as u64),
                     active_connections: connections,
-                    segments: total.map_or_else(Vec::new, |t| vec![SegmentInfo { start: 0, end: t, done: received.min(t) }]),
+                    segments: fragments
+                        .and_then(|count| {
+                            let i = stages.index;
+                            let base = stage_sizes.get(..i).map_or(0, |s| s.iter().sum());
+                            fragment_segments(&dir, base, *stage_sizes.get(i)?, count)
+                        })
+                        .unwrap_or_else(|| {
+                            total.map_or_else(Vec::new, |t| vec![SegmentInfo { start: 0, end: t, done: received.min(t) }])
+                        }),
                 });
                 if last_persist.elapsed() >= transfer::PERSIST_INTERVAL {
                     last_persist = Instant::now();
@@ -732,6 +888,23 @@ pub(crate) async fn run(
             newest_output(&dir).ok_or_else(|| Error::Other("yt-dlp produced no file".into()))?
         }
     };
+    // HEVC was the only choice: make it playable on Windows.
+    let mut produced = produced;
+    if let (true, Some(ffmpeg), Some(vcodec)) = (cfg!(windows), &tools.ffmpeg, chosen_vcodec(&meta))
+    {
+        if ext == "mp4" && is_hevc(vcodec) {
+            let out = dir.join("h264.mp4");
+            match to_h264(ffmpeg, &produced, &out, &token).await {
+                Ok(true) => produced = out,
+                Ok(false) => {
+                    inner.commit_quiet(&info);
+                    return Ok(Outcome::Stopped);
+                }
+                // Keep the HEVC file: it plays with the codec pack or another player.
+                Err(e) => tracing::warn!("HEVC to H.264 failed for {}: {e}", info.id),
+            }
+        }
+    }
     let produced_ext = produced
         .extension()
         .map(|e| e.to_string_lossy().into_owned())
@@ -806,6 +979,13 @@ mod tests {
         assert!(!is_media_site("https://notyoutube.com/watch"));
         assert!(!is_media_site("https://example.com/video.mp4"));
         assert!(is_media_site("https://vm.tiktok.com/ZMabc/"));
+        assert!(is_media_site(
+            "https://www.douyin.com/video/7312345678901234567"
+        ));
+        assert!(is_media_site("https://v.douyin.com/iABCdef/"));
+        assert!(!is_media_site(
+            "https://v3-web.douyinvod.com/abc/video/tos/cn/x/"
+        ));
         assert!(is_media_site("https://player.vimeo.com/video/1"));
         // CDN hosts serve raw files, not pages.
         assert!(!is_media_site(
@@ -917,17 +1097,20 @@ mod tests {
             Some(Tick {
                 downloaded: 1024,
                 total: Some(4096),
-                speed: 512.5
+                speed: 512.5,
+                fragments: None,
             })
         );
         assert_eq!(
-            parse_tick("[dm] 1024 NA 8000.0 NA"),
+            parse_tick("[dm] 1024 NA 8000.0 NA 56"),
             Some(Tick {
                 downloaded: 1024,
                 total: Some(8000),
-                speed: 0.0
+                speed: 0.0,
+                fragments: Some(56),
             })
         );
+        assert_eq!(parse_tick("[dm] 1 2 NA 3 NA").unwrap().fragments, None);
         assert_eq!(parse_tick("[download] 50%"), None);
     }
 
@@ -938,12 +1121,108 @@ mod tests {
             downloaded: d,
             total: Some(total),
             speed: 0.0,
+            fragments: None,
         };
         assert_eq!(s.feed(&t(5_000_000, 10_000_000)), (5_000_000, 10_000_000));
         assert_eq!(s.feed(&t(10_000_000, 10_000_000)), (10_000_000, 10_000_000));
         // Audio stream starts.
         assert_eq!(s.feed(&t(1_000, 3_000_000)), (10_001_000, 13_000_000));
         assert_eq!(s.feed(&t(3_000_000, 3_000_000)), (13_000_000, 13_000_000));
+    }
+
+    #[test]
+    fn fragment_files_become_segments() {
+        const M: u64 = 10 << 20;
+        let dir = tempfile::tempdir().unwrap();
+        let put =
+            |name: &str, len: usize| std::fs::write(dir.path().join(name), vec![0u8; len]).unwrap();
+        // 3 fragments of a 25 MiB stream: 1 appended, 2 done, 3 half way.
+        put("video.f137.mp4.part", M as usize);
+        put("video.f137.mp4.part.ytdl", 10);
+        put("video.f137.mp4.part-Frag2", M as usize);
+        put("video.f137.mp4.part-Frag3.part", 1 << 20);
+        let size = 25 << 20;
+        let segs = fragment_segments(dir.path(), 0, size, 3).unwrap();
+        let tuple = |s: &SegmentInfo| (s.start, s.end, s.done);
+        assert_eq!(
+            segs.iter().map(tuple).collect::<Vec<_>>(),
+            [(0, M, M), (M, 2 * M, M), (2 * M, size, 1 << 20)]
+        );
+        // During the audio stream, the video stream is the base.
+        let segs = fragment_segments(dir.path(), 100, size, 3).unwrap();
+        assert_eq!(tuple(&segs[0]), (0, 100 + M, 100 + M));
+        assert_eq!(tuple(&segs[2]), (100 + 2 * M, 100 + size, 1 << 20));
+        // A plain stream has no fragments.
+        assert!(fragment_segments(dir.path(), 0, size, 1).is_none());
+        assert!(fragment_segments(tempfile::tempdir().unwrap().path(), 0, size, 3).is_none());
+    }
+
+    #[test]
+    fn hevc_names() {
+        for v in ["hev1.1.6.L93.B0", "hvc1", "h265", "bytevc1", "HEVC"] {
+            assert!(is_hevc(v), "{v}");
+        }
+        for v in ["avc1.640028", "h264", "vp9", "av01.0.08M.08"] {
+            assert!(!is_hevc(v), "{v}");
+        }
+        let info = json!({"requested_formats": [{"vcodec": "bytevc1"}, {"vcodec": "none"}]});
+        assert_eq!(chosen_vcodec(&info), Some("bytevc1"));
+        assert_eq!(chosen_vcodec(&json!({"vcodec": "h264"})), Some("h264"));
+        assert_eq!(chosen_vcodec(&json!({"vcodec": "none"})), None);
+    }
+
+    /// Needs a real ffmpeg with libx265/libx264 (the BtbN build has both).
+    #[tokio::test]
+    async fn hevc_is_converted_to_h264() {
+        let Some(ffmpeg) = std::env::var_os("DM_FFMPEG").map(PathBuf::from) else {
+            eprintln!("skipped: set DM_FFMPEG to run");
+            return;
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let hevc = dir.path().join("in.mp4");
+        let made = std::process::Command::new(&ffmpeg)
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc=duration=2:size=320x240",
+            ])
+            .args([
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=duration=2",
+                "-c:v",
+                "libx265",
+                "-c:a",
+                "aac",
+                "-shortest",
+            ])
+            .arg(&hevc)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let out = dir.path().join("h264.mp4");
+        assert!(to_h264(&ffmpeg, &hevc, &out, &CancellationToken::new())
+            .await
+            .unwrap());
+        let probe = std::process::Command::new(ffmpeg.with_file_name("ffprobe.exe"))
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
+            ])
+            .arg(&out)
+            .output()
+            .unwrap();
+        let codecs = String::from_utf8_lossy(&probe.stdout);
+        assert_eq!(codecs.lines().collect::<Vec<_>>(), ["h264", "aac"]);
     }
 
     #[test]

@@ -132,6 +132,14 @@
         break;
       }
     }
+    // Douyin's feed marks each player with data-e2e-vid="<video id>".
+    for (let el = video; el && el !== box.parentElement; el = el.parentElement) {
+      const vid = el.getAttribute && el.getAttribute("data-e2e-vid");
+      if (vid && /^\d{8,}$/.test(vid)) {
+        out.push(`https://www.douyin.com/video/${vid}`);
+        break;
+      }
+    }
     out.push(location.href, ...links);
     return out;
   }

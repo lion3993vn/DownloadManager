@@ -144,6 +144,7 @@ const ERROR_TEXT: [RegExp, string][] = [
   [/this link is a playlist/i, "Đây là danh sách phát. Hãy mở một video cụ thể rồi tải."],
   [/yt-dlp: .*(Private video|This video is private)/i, "Video riêng tư, không tải được."],
   [/yt-dlp: .*(Sign in to confirm|confirm your age|age-restricted)/i, "Video yêu cầu đăng nhập hoặc xác nhận tuổi."],
+  [/yt-dlp: .*Fresh cookies/i, "Trang này cần cookie của trình duyệt (như Douyin). Hãy mở video trong trình duyệt rồi bấm “Gửi sang app” trên extension."],
   [/yt-dlp: .*(Video unavailable|not available)/i, "Video không còn hoặc không xem được ở khu vực này."],
   [/yt-dlp: .*Unsupported URL/i, "Trang này không có video tải được."],
   [/server responded with HTTP 403/i, "Máy chủ từ chối truy cập (HTTP 403). Liên kết có thể đã hết hạn."],

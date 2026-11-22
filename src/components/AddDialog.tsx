@@ -27,10 +27,10 @@ const CONNECTION_CHOICES = [1, 2, 4, 8, 16, 32];
 
 /** Sites whose links are video pages (probing them runs yt-dlp, which takes a few seconds). */
 const VIDEO_SITE =
-  /^https?:\/\/((www|m|mobile|web|music|vm|vt|player|clips|gaming)\.)?(youtube\.com|youtu\.be|tiktok\.com|facebook\.com|fb\.watch|instagram\.com|x\.com|twitter\.com|vimeo\.com|dailymotion\.com|soundcloud\.com|bilibili\.com|twitch\.tv)\//i;
+  /^https?:\/\/((www|m|mobile|web|music|vm|vt|v|player|clips|gaming)\.)?(youtube\.com|youtu\.be|tiktok\.com|douyin\.com|facebook\.com|fb\.watch|instagram\.com|x\.com|twitter\.com|vimeo\.com|dailymotion\.com|soundcloud\.com|bilibili\.com|twitch\.tv)\//i;
 
 /** yt-dlp extractor names -> how people write them. */
-const SITE_NAMES: Record<string, string> = { Youtube: "YouTube", YoutubeTab: "YouTube", Twitter: "X", TikTok: "TikTok", Facebook: "Facebook", Instagram: "Instagram", Vimeo: "Vimeo", Dailymotion: "Dailymotion", Soundcloud: "SoundCloud", BiliBili: "Bilibili", TwitchVod: "Twitch", TwitchClips: "Twitch" };
+const SITE_NAMES: Record<string, string> = { Youtube: "YouTube", YoutubeTab: "YouTube", Twitter: "X", TikTok: "TikTok", Douyin: "Douyin", Facebook: "Facebook", Instagram: "Instagram", Vimeo: "Vimeo", Dailymotion: "Dailymotion", Soundcloud: "SoundCloud", BiliBili: "Bilibili", TwitchVod: "Twitch", TwitchClips: "Twitch" };
 
 const MEDIA_EXT = /\.(mp4|m4v|mkv|webm|mov|mp3|m4a|opus|ogg)$/i;
 const withExt = (name: string, ext: string) => (name ? `${name.replace(MEDIA_EXT, "")}.${ext}` : name);

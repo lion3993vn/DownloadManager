@@ -6,6 +6,13 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+- **Tải video Douyin.** Mở video trên douyin.com rồi bấm nút tải trên video, hoặc "Gửi sang app" trong extension. Douyin bắt buộc có cookie của trình duyệt, nên dán link trực tiếp vào app sẽ không tải được.
+
+### 🔧 Cải tiến
+- Trên Windows, video chỉ có định dạng HEVC được tự chuyển sang H.264 sau khi tải xong, nên mở được ngay bằng Media Player mà không cần mua codec.
+- Tải video YouTube giờ hiện từng luồng đang chạy, giống như tải tệp: thanh tiến độ chia theo từng đoạn và bảng *Các luồng tải* trong phần chi tiết.
+
 ## [0.4.2] - 2026-11-22
 
 ### 🔧 Cải tiến
