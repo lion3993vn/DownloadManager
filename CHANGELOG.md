@@ -6,6 +6,21 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+
+**▶️ Tải video YouTube, TikTok, Facebook…**
+- Dán link YouTube (video, Shorts), TikTok, Facebook, Instagram, X, Vimeo, Dailymotion, SoundCloud, Bilibili, Twitch… vào app: hiện ảnh thu nhỏ, tiêu đề, kênh, thời lượng và cho **chọn chất lượng** (4K, 1080p, 720p… hoặc **MP3**) kèm dung lượng ước tính.
+- Trên các trang này, nút **Tải video** của extension và cửa sổ extension gửi thẳng video sang app.
+- Tạm dừng / tiếp tục được. Hình và tiếng được ghép thành MP4 (ưu tiên H.264/AAC để phát được ở mọi nơi).
+- Dùng công cụ mã nguồn mở **yt-dlp** và **ffmpeg**. App tự tải về ở lần đầu (khoảng 110 MB trên Windows, có kiểm tra SHA-256) và tự cập nhật yt-dlp mỗi ngày. Quản lý ở *Cài đặt → Video*.
+
+**📊 Trang Thống kê**
+- Mục mới trên sidebar: dung lượng đã tải theo ngày, tỉ lệ thành công, tệp lớn nhất, theo loại tệp, các trang tải nhiều nhất và tốc độ trực tiếp. Chọn khoảng 7 / 30 / 90 ngày.
+
+**🪟 Giao diện**
+- Thanh tiêu đề mới cùng phong cách với app (Windows), có nút thu nhỏ / phóng to / đóng.
+- Sidebar thu gọn được thành dải icon (**Ctrl+B**).
+
 ## [0.4.0] - 2026-11-22
 
 ### ✨ Tính năng mới
