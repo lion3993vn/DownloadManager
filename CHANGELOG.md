@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-22
+
 ### ✨ Tính năng mới
 
 **▶️ Tải video YouTube, TikTok, Facebook…**
@@ -102,7 +104,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.1
 [0.4.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.0
 [0.3.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.3.1
 [0.3.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.3.0
