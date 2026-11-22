@@ -6,7 +6,27 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+
+**🎬 Tải video trên trang web**
+- Extension tự tìm video trên trang đang xem: tệp video/âm thanh (mp4, webm, mkv, mp3…) và luồng **HLS** (`.m3u8`) mà nhiều trang phim dùng.
+- Biểu tượng extension hiện số video tìm được. Bấm vào để xem danh sách kèm chất lượng (720p, 1080p…), thời lượng, dung lượng ước tính và nút **Tải**.
+- Rê chuột vào video sẽ hiện nút **Tải video** ở góc, kể cả khi trình phát nằm trong iframe hay đang xem toàn màn hình. Có thể tắt nút này trong *Tùy chọn* của extension.
+- Chuột phải vào video của trình phát streaming → *Tải bằng DownloadManager* cũng dùng luồng đã tìm thấy.
+
+**📺 Tải luồng HLS**
+- Dán link `.m3u8` vào app hoặc gửi từ extension: app tự chọn chất lượng cao nhất, tải song song nhiều đoạn rồi ghép thành một tệp `.ts` (hoặc `.mp4` với luồng fMP4). Không cần cài thêm ffmpeg.
+- Hỗ trợ luồng mã hóa AES-128. **Tạm dừng / tiếp tục được**, kể cả sau khi tắt app: các đoạn đã tải được giữ lại.
+- Hộp thoại thêm link hiện thông tin video: chất lượng, thời lượng, số đoạn, dung lượng ước tính.
+- Chưa hỗ trợ: YouTube, Facebook, luồng DASH, video có DRM, luồng phát trực tiếp, và HLS tách riêng tiếng/hình. Các trường hợp này đều có thông báo lỗi rõ ràng.
+
+**🧩 Nhận diện extension bản cũ**
+- App biết extension trên từng trình duyệt đang ở phiên bản nào. Nếu cũ hơn bản đi kèm app, sidebar hiện thẻ **Cập nhật extension** và trình hướng dẫn chỉ cách cập nhật.
+- Từ bản này trở đi, **extension tự cập nhật** mỗi khi app có bản mới, không cần làm gì. Riêng lần này cần bấm *Tải lại* extension một lần (app sẽ nhắc).
+
 ### 🔧 Cải tiến
+- Giao diện extension làm lại hoàn toàn, cùng phong cách với app, có chế độ sáng/tối: công tắc gạt, thẻ trạng thái kết nối, danh sách đuôi tệp dạng nhãn dễ thêm/xóa, mã ghép cặp được che.
+- Thông báo lỗi thường gặp được dịch sang tiếng Việt (luồng trực tiếp, DRM, liên kết hết hạn…).
 - macOS có 2 bộ cài riêng: **Apple Silicon** (`_aarch64.dmg`) và **Intel** (`_x64.dmg`), nhỏ hơn bản universal trước đây. App tự cập nhật vẫn tải đúng bản cho từng máy.
 - Phát hành nhanh hơn: build song song, tối ưu thời gian biên dịch, cache thư viện được làm nóng sẵn.
 
