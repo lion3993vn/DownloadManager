@@ -38,6 +38,34 @@ impl Status {
     }
 }
 
+/// What is being downloaded.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DownloadKind {
+    /// One file over HTTP (ranges when the server allows them).
+    #[default]
+    File,
+    /// An HLS playlist (`.m3u8`): every media segment is fetched and the
+    /// segments are joined into one file.
+    Hls,
+}
+
+impl DownloadKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DownloadKind::File => "file",
+            DownloadKind::Hls => "hls",
+        }
+    }
+
+    pub fn parse(s: &str) -> DownloadKind {
+        match s {
+            "hls" => DownloadKind::Hls,
+            _ => DownloadKind::File,
+        }
+    }
+}
+
 /// Extra request context, usually captured from the browser so that
 /// authenticated / hot-link protected downloads keep working.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +92,9 @@ pub struct NewDownload {
     /// Add to the list without starting.
     #[serde(default)]
     pub start_paused: bool,
+    /// `None`: detected from the URL (`.m3u8` means HLS) and the server response.
+    #[serde(default)]
+    pub kind: Option<DownloadKind>,
 }
 
 /// One byte range `[start, end)` of the file and how much of it is on disk.
@@ -80,6 +111,7 @@ pub struct SegmentInfo {
 pub struct DownloadInfo {
     pub id: DownloadId,
     pub url: String,
+    pub kind: DownloadKind,
     pub file_name: String,
     pub save_dir: PathBuf,
     pub total_size: Option<u64>,
@@ -186,10 +218,31 @@ pub struct ProbeResult {
     pub file_name: String,
     pub content_type: Option<String>,
     pub final_url: String,
+    /// Set when the URL is an HLS playlist.
+    pub stream: Option<StreamInfo>,
     #[serde(skip)]
     pub etag: Option<String>,
     #[serde(skip)]
     pub last_modified: Option<String>,
     #[serde(skip)]
     pub name_from_server: bool,
+}
+
+/// Summary of an HLS stream, shown before downloading it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamInfo {
+    pub duration_secs: f64,
+    pub segments: u32,
+    /// `(width, height)` of the chosen variant, when the playlist says.
+    pub resolution: Option<(u32, u32)>,
+    /// Bits per second of the chosen variant, when the playlist says.
+    pub bandwidth: Option<u64>,
+    /// Rough size from bandwidth × duration.
+    pub estimated_size: Option<u64>,
+    /// A live stream (no end): cannot be downloaded.
+    pub live: bool,
+    pub encrypted: bool,
+    /// Output container: `"ts"` or `"mp4"` (fragmented MP4 with an init section).
+    pub container: String,
 }

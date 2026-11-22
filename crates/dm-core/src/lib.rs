@@ -12,6 +12,7 @@
 
 mod engine;
 mod error;
+mod hls;
 mod http;
 pub mod naming;
 mod planner;

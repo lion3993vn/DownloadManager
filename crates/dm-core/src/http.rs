@@ -89,6 +89,7 @@ pub async fn probe(client: &Client, url: &str, headers: &RequestHeaders) -> Resu
         file_name,
         content_type: header_string(h, header::CONTENT_TYPE),
         final_url,
+        stream: None,
         etag: header_string(h, header::ETAG).filter(|e| !e.starts_with("W/")),
         last_modified: header_string(h, header::LAST_MODIFIED),
         name_from_server,

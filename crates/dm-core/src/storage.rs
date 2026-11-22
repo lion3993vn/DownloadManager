@@ -77,3 +77,17 @@ fn make_sparse(file: &File) {
 fn make_sparse(_file: &File) {
     // ext4/APFS/btrfs create sparse files on set_len already.
 }
+
+/// Folder next to the part file where an HLS download keeps its segments.
+pub fn part_dir(part: &Path) -> std::path::PathBuf {
+    let mut s = part.as_os_str().to_owned();
+    s.push(".d");
+    s.into()
+}
+
+/// Delete all partial data of a download: the part file and, for HLS, the
+/// segment folder. Missing files are fine.
+pub fn remove_part(part: &Path) {
+    let _ = std::fs::remove_file(part);
+    let _ = std::fs::remove_dir_all(part_dir(part));
+}

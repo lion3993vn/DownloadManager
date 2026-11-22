@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 use crate::http;
 use crate::naming;
 use crate::rate_limit::RateLimiter;
+use crate::storage::remove_part;
 use crate::store::Store;
 use crate::transfer::{self, Outcome};
 use crate::types::*;
@@ -146,7 +147,15 @@ impl Engine {
 
     /// Inspect a URL (size, name, range support) without downloading it.
     pub async fn probe(&self, url: &str, headers: &RequestHeaders) -> Result<ProbeResult> {
-        http::probe(&self.inner.client, url, headers).await
+        let mut probe = http::probe(&self.inner.client, url, headers).await?;
+        if crate::hls::is_playlist(&probe) {
+            let stream = crate::hls::inspect(&self.inner.client, &probe.final_url, headers).await?;
+            probe.file_name = crate::hls::output_name(&probe.file_name, &stream.container);
+            probe.total_size = stream.estimated_size;
+            probe.resumable = !stream.live;
+            probe.stream = Some(stream);
+        }
+        Ok(probe)
     }
 
     pub fn add(&self, req: NewDownload) -> Result<DownloadInfo> {
@@ -156,14 +165,22 @@ impl Engine {
             .save_dir
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or(settings.download_dir);
+        let kind = req
+            .kind
+            .unwrap_or_else(|| crate::hls::kind_from_url(&req.url));
         let auto_name = req.file_name.as_deref().is_none_or(|n| n.trim().is_empty());
         let wanted = match req.file_name.as_deref() {
             Some(n) if !auto_name => naming::sanitize(n),
             _ => naming::name_from_url(&req.url),
         };
+        let wanted = match kind {
+            DownloadKind::Hls => crate::hls::output_name(&wanted, "ts"),
+            DownloadKind::File => wanted,
+        };
         let mut info = DownloadInfo {
             id: 0,
             url: req.url,
+            kind,
             file_name: wanted,
             save_dir,
             total_size: None,
@@ -242,7 +259,7 @@ impl Engine {
             }
         })?;
         if let Some(p) = delete_now {
-            let _ = std::fs::remove_file(p);
+            remove_part(&p);
         }
         Ok(())
     }
@@ -256,7 +273,7 @@ impl Engine {
                 token.cancel();
                 st.orphaned_parts.insert(id, info.part_path());
             } else {
-                let _ = std::fs::remove_file(info.part_path());
+                remove_part(&info.part_path());
             }
             info
         };
@@ -361,6 +378,7 @@ impl Inner {
     fn merge_transfer_fields(&self, info: &DownloadInfo) -> Option<DownloadInfo> {
         let mut st = self.state.lock().unwrap();
         let d = st.downloads.get_mut(&info.id)?;
+        d.kind = info.kind;
         d.file_name.clone_from(&info.file_name);
         d.total_size = info.total_size;
         d.downloaded = info.downloaded;
@@ -473,7 +491,7 @@ impl Inner {
             })
         };
         if let Some(p) = delete_part {
-            let _ = tokio::fs::remove_file(p).await;
+            let _ = tokio::task::spawn_blocking(move || remove_part(&p)).await;
         }
         if let Some(download) = updated {
             self.emit(EngineEvent::Updated { download });

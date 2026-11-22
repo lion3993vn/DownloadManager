@@ -7,8 +7,9 @@ use crate::error::{Error, Result};
 use crate::http;
 use crate::naming;
 use crate::planner::plan_segments;
+use crate::storage::remove_part;
 use crate::storage::{open_part_file, write_all_at};
-use crate::types::{DownloadId, DownloadInfo, Progress, SegmentInfo};
+use crate::types::{DownloadId, DownloadInfo, DownloadKind, Progress, SegmentInfo};
 use futures_util::StreamExt;
 use reqwest::header::RANGE;
 use reqwest::StatusCode;
@@ -22,9 +23,9 @@ use tokio_util::sync::CancellationToken;
 /// Bytes buffered per connection before they are written to disk.
 const WRITE_BUFFER: usize = 512 * 1024;
 /// A connection that receives nothing for this long is dropped and retried.
-const READ_TIMEOUT: Duration = Duration::from_secs(30);
-const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
-const PERSIST_INTERVAL: Duration = Duration::from_secs(1);
+pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(30);
+pub(crate) const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+pub(crate) const PERSIST_INTERVAL: Duration = Duration::from_secs(1);
 /// Marks the end of a single-stream download whose size is unknown.
 const UNKNOWN_END: u64 = u64::MAX;
 
@@ -39,6 +40,9 @@ pub(crate) async fn run(
     token: CancellationToken,
 ) -> Result<Outcome> {
     let mut info = inner.snapshot(id)?;
+    if info.kind == DownloadKind::Hls {
+        return crate::hls::run(inner, info, token).await;
+    }
     let settings = inner.settings();
 
     // 1. Probe the server (also validates that a resume is still safe).
@@ -63,6 +67,15 @@ pub(crate) async fn run(
             Err(e) => return Err(e),
         }
     };
+    // A playlist served without the `.m3u8` extension: download it as HLS.
+    if crate::hls::is_playlist(&probe) {
+        remove_part(&info.part_path());
+        info.kind = DownloadKind::Hls;
+        info.segments.clear();
+        info.downloaded = 0;
+        inner.commit(&info);
+        return crate::hls::run(inner, info, token).await;
+    }
     let remote_changed = info.total_size != probe.total_size
         || differs(&info.etag, &probe.etag)
         || differs(&info.last_modified, &probe.last_modified);
@@ -202,7 +215,7 @@ pub(crate) async fn run(
     Err(first_error.unwrap_or(Error::Incomplete))
 }
 
-async fn finalize(inner: &Inner, info: &mut DownloadInfo) -> Result<()> {
+pub(crate) async fn finalize(inner: &Inner, info: &mut DownloadInfo) -> Result<()> {
     let part = info.part_path();
     let dir = info.save_dir.clone();
     let name = info.file_name.clone();
@@ -226,7 +239,7 @@ fn differs(old: &Option<String>, new: &Option<String>) -> bool {
     matches!((old, new), (Some(a), Some(b)) if a != b)
 }
 
-fn join_error(e: tokio::task::JoinError) -> Error {
+pub(crate) fn join_error(e: tokio::task::JoinError) -> Error {
     Error::Other(format!("internal task failed: {e}"))
 }
 
@@ -588,7 +601,7 @@ async fn single_stream_worker(ctx: Arc<Ctx>, token: CancellationToken) -> Result
     }
 }
 
-fn retry_after(e: &Error) -> Option<Duration> {
+pub(crate) fn retry_after(e: &Error) -> Option<Duration> {
     match e {
         Error::Busy { retry_after, .. } => {
             Some(Duration::from_secs(retry_after.unwrap_or(2).clamp(1, 60)))
@@ -597,7 +610,11 @@ fn retry_after(e: &Error) -> Option<Duration> {
     }
 }
 
-async fn backoff(failures: u32, retry_after: Option<Duration>, token: &CancellationToken) {
+pub(crate) async fn backoff(
+    failures: u32,
+    retry_after: Option<Duration>,
+    token: &CancellationToken,
+) {
     let exp = Duration::from_millis(500 * 2u64.pow(failures.saturating_sub(1).min(5)));
     let delay = retry_after
         .unwrap_or(Duration::ZERO)
@@ -609,14 +626,14 @@ async fn backoff(failures: u32, retry_after: Option<Duration>, token: &Cancellat
 }
 
 /// Exponentially smoothed bytes/second.
-struct SpeedMeter {
+pub(crate) struct SpeedMeter {
     last_bytes: u64,
     last_time: Instant,
     speed: f64,
 }
 
 impl SpeedMeter {
-    fn new(bytes: u64) -> Self {
+    pub(crate) fn new(bytes: u64) -> Self {
         Self {
             last_bytes: bytes,
             last_time: Instant::now(),
@@ -624,7 +641,7 @@ impl SpeedMeter {
         }
     }
 
-    fn update(&mut self, bytes: u64) -> f64 {
+    pub(crate) fn update(&mut self, bytes: u64) -> f64 {
         let now = Instant::now();
         let dt = now.duration_since(self.last_time).as_secs_f64();
         if dt > 0.0 {

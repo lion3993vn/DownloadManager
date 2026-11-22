@@ -10,6 +10,7 @@
 //! - `/attachment`  Content-Disposition file name
 //! - `/limited`     range support, but 429 beyond 2 concurrent connections
 //! - `/rangeforbidden` 403 for any request with a `Range` header
+//! - `/hls/{name}`  HLS fixtures over a separate payload (see [`serve_hls`])
 //! - anything else  404
 
 #![allow(dead_code)]
@@ -35,6 +36,7 @@ struct Srv {
     range_requests: Arc<AtomicU64>,
     concurrent: Arc<AtomicU64>,
     rejected: Arc<AtomicU64>,
+    hls: Arc<Hls>,
 }
 
 /// Decrements the concurrent-connection counter when the body is dropped.
@@ -66,6 +68,16 @@ impl TestServer {
     pub fn rejected(&self) -> u64 {
         self.srv.rejected.load(Ordering::SeqCst)
     }
+    /// What every HLS fixture decodes to.
+    pub fn hls_data(&self) -> &[u8] {
+        &self.srv.hls.data
+    }
+    pub fn hls_init(&self) -> &[u8] {
+        HLS_INIT
+    }
+    pub fn hls_segment_requests(&self) -> u64 {
+        self.srv.hls.segment_requests.load(Ordering::SeqCst)
+    }
 }
 
 fn payload(size: usize, seed: u32) -> Vec<u8> {
@@ -89,9 +101,11 @@ pub async fn start(size: usize) -> TestServer {
         range_requests: Arc::new(AtomicU64::new(0)),
         concurrent: Arc::new(AtomicU64::new(0)),
         rejected: Arc::new(AtomicU64::new(0)),
+        hls: Arc::new(Hls::new(size)),
     };
     let app = Router::new()
         .route("/bump", get(bump))
+        .route("/hls/{name}", get(serve_hls))
         .route("/{mode}", get(serve))
         .with_state(srv.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -325,4 +339,180 @@ pub async fn wait_idle(engine: &Engine, id: DownloadId) {
         tokio::time::sleep(Duration::from_millis(25)).await;
     }
     panic!("task for {id} did not stop");
+}
+
+// ---------------------------------------------------------------------------
+// HLS fixtures
+// ---------------------------------------------------------------------------
+
+const HLS_SEGMENTS: usize = 12;
+const HLS_KEY: [u8; 16] = *b"0123456789abcdef";
+const HLS_IV: [u8; 16] = [7; 16];
+/// First encrypted segment's media sequence number (implicit IV).
+const HLS_SEQ: u64 = 5;
+const HLS_INIT: &[u8] = b"fake-init-section";
+
+struct Hls {
+    data: Vec<u8>,
+    /// `bounds[i]..bounds[i + 1]` is segment `i`; sizes vary on purpose.
+    bounds: Vec<usize>,
+    segment_requests: AtomicU64,
+}
+
+impl Hls {
+    fn new(size: usize) -> Self {
+        let data = payload(size, 3);
+        let weights: Vec<usize> = (0..HLS_SEGMENTS).map(|i| 3 + (i * 7) % 5).collect();
+        let sum: usize = weights.iter().sum();
+        let mut bounds = vec![0];
+        let mut acc = 0;
+        for w in &weights[..HLS_SEGMENTS - 1] {
+            acc += w;
+            bounds.push(size * acc / sum);
+        }
+        bounds.push(size);
+        Hls {
+            data,
+            bounds,
+            segment_requests: AtomicU64::new(0),
+        }
+    }
+
+    fn segment(&self, i: usize) -> &[u8] {
+        &self.data[self.bounds[i]..self.bounds[i + 1]]
+    }
+
+    /// Segments 0..6 use the explicit IV, the rest the sequence-number IV.
+    fn encrypted(&self, i: usize) -> Vec<u8> {
+        use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
+        let iv = if i < HLS_SEGMENTS / 2 {
+            HLS_IV
+        } else {
+            u128::from(HLS_SEQ + i as u64).to_be_bytes()
+        };
+        cbc::Encryptor::<aes::Aes128>::new(&HLS_KEY.into(), &iv.into())
+            .encrypt_padded_vec_mut::<Pkcs7>(self.segment(i))
+    }
+
+    fn media(&self, prefix: &str, ended: bool) -> String {
+        let mut s = String::from("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n");
+        for i in 0..HLS_SEGMENTS {
+            s += &format!("#EXTINF:4.0,\n{prefix}{i}.ts\n");
+        }
+        if ended {
+            s += "#EXT-X-ENDLIST\n";
+        }
+        s
+    }
+}
+
+fn playlist(body: String) -> Response {
+    (
+        [(header::CONTENT_TYPE, "application/vnd.apple.mpegurl")],
+        body,
+    )
+        .into_response()
+}
+
+/// - `master.m3u8`   two variants; only the 720p one (`media.m3u8`) exists
+/// - `media.m3u8`    12 plain segments `seg{i}.ts`
+/// - `noext`         same as `media.m3u8` but without the `.m3u8` extension
+/// - `slow.m3u8`     same segments, throttled (for pause / resume)
+/// - `enc.m3u8`      AES-128 (explicit IV, then sequence-number IV), key at `key`
+/// - `fmp4.m3u8`     init section `init.mp4` + the plain segments
+/// - `range.m3u8`    byte ranges into the single resource `all.bin`
+/// - `live.m3u8`     no `#EXT-X-ENDLIST`
+async fn serve_hls(State(s): State<Srv>, Path(name): Path<String>, headers: HeaderMap) -> Response {
+    let h = &s.hls;
+    let n = HLS_SEGMENTS;
+    let seg_index = |prefix: &str| -> Option<usize> {
+        let i: usize = name
+            .strip_prefix(prefix)?
+            .strip_suffix(".ts")?
+            .parse()
+            .ok()?;
+        (i < n).then_some(i)
+    };
+    if let Some(i) = seg_index("seg") {
+        h.segment_requests.fetch_add(1, Ordering::SeqCst);
+        return Bytes::copy_from_slice(h.segment(i)).into_response();
+    }
+    if let Some(i) = seg_index("slow") {
+        h.segment_requests.fetch_add(1, Ordering::SeqCst);
+        let data = Arc::new(h.segment(i).to_vec());
+        let len = data.len();
+        let opts = BodyOpts {
+            delay_per_chunk: Some(Duration::from_millis(60)),
+            ..Default::default()
+        };
+        return stream_body(data, 0, len, opts).into_response();
+    }
+    if let Some(i) = seg_index("enc") {
+        h.segment_requests.fetch_add(1, Ordering::SeqCst);
+        return h.encrypted(i).into_response();
+    }
+    match name.as_str() {
+        "master.m3u8" => playlist(
+            "#EXTM3U\n\
+             #EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=640x360\nlow.m3u8\n\
+             #EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720\nmedia.m3u8\n"
+                .into(),
+        ),
+        "media.m3u8" | "noext" => playlist(h.media("seg", true)),
+        "slow.m3u8" => playlist(h.media("slow", true)),
+        "live.m3u8" => playlist(h.media("seg", false)),
+        "fmp4.m3u8" => {
+            let body = h.media("seg", true).replacen(
+                "#EXT-X-TARGETDURATION:4\n",
+                "#EXT-X-TARGETDURATION:4\n#EXT-X-MAP:URI=\"init.mp4\"\n",
+                1,
+            );
+            playlist(body)
+        }
+        "init.mp4" => Bytes::from_static(HLS_INIT).into_response(),
+        "enc.m3u8" => {
+            let iv: String = HLS_IV.iter().map(|b| format!("{b:02x}")).collect();
+            let mut body = format!(
+                "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{HLS_SEQ}\n\
+                 #EXT-X-KEY:METHOD=AES-128,URI=\"key\",IV=0x{iv}\n"
+            );
+            for i in 0..n {
+                if i == n / 2 {
+                    body += "#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n";
+                }
+                body += &format!("#EXTINF:4.0,\nenc{i}.ts\n");
+            }
+            body += "#EXT-X-ENDLIST\n";
+            playlist(body)
+        }
+        "key" => Bytes::from_static(&HLS_KEY).into_response(),
+        "range.m3u8" => {
+            let mut body = String::from("#EXTM3U\n#EXT-X-VERSION:4\n#EXT-X-TARGETDURATION:4\n");
+            for i in 0..n {
+                let (a, b) = (h.bounds[i], h.bounds[i + 1]);
+                // Every other segment leaves the offset implicit.
+                if i % 2 == 0 {
+                    body += &format!("#EXTINF:4.0,\n#EXT-X-BYTERANGE:{}@{a}\nall.bin\n", b - a);
+                } else {
+                    body += &format!("#EXTINF:4.0,\n#EXT-X-BYTERANGE:{}\nall.bin\n", b - a);
+                }
+            }
+            body += "#EXT-X-ENDLIST\n";
+            playlist(body)
+        }
+        "all.bin" => {
+            h.segment_requests.fetch_add(1, Ordering::SeqCst);
+            let len = h.data.len() as u64;
+            match parse_range(&headers, len) {
+                Some((a, b)) => (
+                    StatusCode::PARTIAL_CONTENT,
+                    [(header::CONTENT_RANGE, format!("bytes {a}-{b}/{len}"))],
+                    Bytes::copy_from_slice(&h.data[a as usize..=b as usize]),
+                )
+                    .into_response(),
+                None => Bytes::copy_from_slice(&h.data).into_response(),
+            }
+        }
+        _ => StatusCode::NOT_FOUND.into_response(),
+    }
 }
