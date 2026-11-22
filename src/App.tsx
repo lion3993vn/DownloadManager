@@ -25,7 +25,9 @@ import { DownloadList, type RowActions } from "./components/DownloadList";
 import { ExtensionWizard } from "./components/ExtensionWizard";
 import { Modal } from "./components/Modal";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { Sidebar, STATUS_FILTERS, TYPE_FILTERS, type Filter, type StatusFilter } from "./components/Sidebar";
+import { Sidebar, STATUS_FILTERS, TYPE_FILTERS, type Filter, type StatusFilter, type View } from "./components/Sidebar";
+import { StatsPage } from "./components/StatsPage";
+import { CUSTOM_TITLEBAR, Titlebar } from "./components/Titlebar";
 import { StatsBar } from "./components/StatsBar";
 import { Toasts, useToasts } from "./components/Toasts";
 import {
@@ -51,6 +53,7 @@ const MATCH: Record<StatusFilter, (s: Status) => boolean> = {
 };
 
 const ONBOARDED_KEY = "dm.onboarded";
+const SIDEBAR_KEY = "dm.sidebarCollapsed";
 
 export default function App() {
   const { rows, loaded } = useDownloads();
@@ -59,6 +62,24 @@ export default function App() {
 
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>({ kind: "status", key: "all" });
+  const [view, setView] = useState<View>("downloads");
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? "0" : "1");
+      } catch {
+        /* ignore */
+      }
+      return !c;
+    });
+  }, []);
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
@@ -238,7 +259,11 @@ export default function App() {
         setShowAdd(true);
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        document.getElementById("search")?.focus();
+        setView("downloads");
+        setTimeout(() => document.getElementById("search")?.focus());
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
       } else if (!typing && e.key === "Delete" && sel) {
         setConfirmRemove(sel);
       } else if (!typing && e.key === " " && sel) {
@@ -261,80 +286,98 @@ export default function App() {
   const pair = pairs[0];
 
   return (
-    <div className="flex h-full">
-      <Sidebar
-        filter={filter}
-        onFilter={(f) => {
-          setFilter(f);
-          setSelected(null);
-        }}
-        statusCounts={statusCounts}
-        typeCounts={typeCounts}
-        extensions={extensions}
-        outdatedExtensions={outdated}
-        bundledExtension={bundledExt}
-        bridgeRunning={bridge?.running ?? false}
-        onAdd={() => setShowAdd(true)}
-        onSettings={() => setShowSettings(true)}
-        onInstallExtension={() => setShowWizard(true)}
-        version={updater.version}
-        update={availableUpdate}
-        onChangelog={() => setShowChangelog(true)}
-      />
-
-      <main className="@container flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 px-5 pt-5 pb-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[20px] font-semibold tracking-tight">{title}</h1>
-            <p className="text-[12px] text-mute">{visible.length} tệp</p>
-          </div>
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint" />
-            <input id="search" className="field w-44 rounded-full py-1.5 pl-9 @[820px]:w-64" placeholder="Tìm theo tên hoặc liên kết…" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </div>
-          <button className="btn-outline" disabled={!hasPaused} onClick={() => run(api.resumeAll())} title="Tiếp tục tất cả">
-            <PlayIcon /> <span className="hidden @[700px]:inline">Tiếp tục hết</span>
-          </button>
-          <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title="Tạm dừng tất cả">
-            <PauseIcon /> <span className="hidden @[700px]:inline">Dừng hết</span>
-          </button>
-        </header>
-
-        <StatsBar
-          speed={totalSpeed}
-          history={history}
-          active={all.filter((r) => r.status === "downloading").length}
-          queued={all.filter((r) => r.status === "queued").length}
-          completed={statusCounts.completed}
-          totalBytes={all.reduce((s, r) => s + (r.status === "completed" ? (r.totalSize ?? r.downloaded) : 0), 0)}
+    <div className="flex h-full flex-col">
+      {CUSTOM_TITLEBAR && <Titlebar sidebarCollapsed={collapsed} onToggleSidebar={toggleSidebar} />}
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          view={view}
+          onStats={() => {
+            setView("stats");
+            setSelected(null);
+          }}
+          collapsed={collapsed}
+          onToggleCollapsed={toggleSidebar}
+          showBrand={!CUSTOM_TITLEBAR}
+          filter={filter}
+          onFilter={(f) => {
+            setFilter(f);
+            setView("downloads");
+            setSelected(null);
+          }}
+          statusCounts={statusCounts}
+          typeCounts={typeCounts}
+          extensions={extensions}
+          outdatedExtensions={outdated}
+          bundledExtension={bundledExt}
+          bridgeRunning={bridge?.running ?? false}
+          onAdd={() => setShowAdd(true)}
+          onSettings={() => setShowSettings(true)}
+          onInstallExtension={() => setShowWizard(true)}
+          version={updater.version}
+          update={availableUpdate}
+          onChangelog={() => setShowChangelog(true)}
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto" onMouseDown={(e) => e.target === e.currentTarget && setSelected(null)}>
-          {loaded && visible.length > 0 && <DownloadList rows={visible} selected={selected} onSelect={setSelected} actions={actions} />}
-          {loaded && visible.length === 0 && (
-            <EmptyState
-              filtered={all.length > 0}
-              hasExtension={extensions.length > 0}
-              onAdd={() => setShowAdd(true)}
-              onExtension={() => setShowWizard(true)}
-            />
+        <main className="@container flex min-w-0 flex-1 flex-col">
+          {view === "stats" ? (
+            <StatsPage rows={all} speedHistory={history} />
+          ) : (
+            <>
+              <header className="flex items-center gap-3 px-5 pt-5 pb-4">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[20px] font-semibold tracking-tight">{title}</h1>
+                  <p className="text-[12px] text-mute">{visible.length} tệp</p>
+                </div>
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint" />
+                  <input id="search" className="field w-44 rounded-full py-1.5 pl-9 @[820px]:w-64" placeholder="Tìm theo tên hoặc liên kết…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                </div>
+                <button className="btn-outline" disabled={!hasPaused} onClick={() => run(api.resumeAll())} title="Tiếp tục tất cả">
+                  <PlayIcon /> <span className="hidden @[700px]:inline">Tiếp tục hết</span>
+                </button>
+                <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title="Tạm dừng tất cả">
+                  <PauseIcon /> <span className="hidden @[700px]:inline">Dừng hết</span>
+                </button>
+              </header>
+
+              <StatsBar
+                speed={totalSpeed}
+                history={history}
+                active={all.filter((r) => r.status === "downloading").length}
+                queued={all.filter((r) => r.status === "queued").length}
+                completed={statusCounts.completed}
+                totalBytes={all.reduce((s, r) => s + (r.status === "completed" ? (r.totalSize ?? r.downloaded) : 0), 0)}
+              />
+
+              <div className="min-h-0 flex-1 overflow-y-auto" onMouseDown={(e) => e.target === e.currentTarget && setSelected(null)}>
+                {loaded && visible.length > 0 && <DownloadList rows={visible} selected={selected} onSelect={setSelected} actions={actions} />}
+                {loaded && visible.length === 0 && (
+                  <EmptyState
+                    filtered={all.length > 0}
+                    hasExtension={extensions.length > 0}
+                    onAdd={() => setShowAdd(true)}
+                    onExtension={() => setShowWizard(true)}
+                  />
+                )}
+              </div>
+            </>
           )}
-        </div>
-      </main>
+        </main>
 
-      {sel && (
-        <DetailsPanel
-          key={sel.id}
-          row={sel}
-          onClose={() => setSelected(null)}
-          onPause={() => actions.pause(sel)}
-          onResume={() => actions.resume(sel)}
-          onCancel={() => run(api.cancel(sel.id))}
-          onRemove={() => setConfirmRemove(sel)}
-          onOpen={() => actions.open(sel)}
-          onFolder={() => actions.folder(sel)}
-        />
-      )}
+        {view === "downloads" && sel && (
+          <DetailsPanel
+            key={sel.id}
+            row={sel}
+            onClose={() => setSelected(null)}
+            onPause={() => actions.pause(sel)}
+            onResume={() => actions.resume(sel)}
+            onCancel={() => run(api.cancel(sel.id))}
+            onRemove={() => setConfirmRemove(sel)}
+            onOpen={() => actions.open(sel)}
+            onFolder={() => actions.folder(sel)}
+          />
+        )}
+      </div>
 
       {/* Overlays */}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.row)} onClose={() => setMenu(null)} />}

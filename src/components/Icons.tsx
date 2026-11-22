@@ -251,3 +251,15 @@ export const SparklesIcon = (p: P) => (
     <path d="M19 3v3M17.5 4.5h3M5 17v3M3.5 18.5h3" />
   </Icon>
 );
+export const ChartIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+    <path d="M7 16v-4M12 16V8M17 16v-7" />
+  </Icon>
+);
+export const PanelLeftIcon = (p: P) => (
+  <Icon {...p}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M9 3v18" />
+  </Icon>
+);

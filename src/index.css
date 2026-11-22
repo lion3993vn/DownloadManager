@@ -16,6 +16,9 @@
   --faint: #94a3b8;
   --track: #e6eaf2;
   --shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  /* Chart marks (validated against --card: dataviz validate_palette.js). */
+  --chart: #2563eb;
+  --chart-hover: #3b74f0;
   color-scheme: light;
 }
 
@@ -32,6 +35,8 @@
   --faint: #5b6a8a;
   --track: #1d2840;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  --chart: #3b82f6;
+  --chart-hover: #60a5fa;
   color-scheme: dark;
 }
 
