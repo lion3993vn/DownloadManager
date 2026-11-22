@@ -148,6 +148,12 @@ pub fn extension_setup_info(app: AppHandle) -> CmdResult<ExtensionSetupInfo> {
     extension_setup::info(&app)
 }
 
+/// Version of the extension bundled with the app.
+#[tauri::command]
+pub fn extension_version(app: AppHandle) -> Option<String> {
+    crate::extension_setup::bundled_version(&app)
+}
+
 #[tauri::command]
 pub fn connected_extensions(state: State<'_, AppState>) -> Vec<ConnectedExtension> {
     state.extensions.lock().unwrap().clone()

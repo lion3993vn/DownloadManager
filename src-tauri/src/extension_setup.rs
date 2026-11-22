@@ -37,6 +37,26 @@ pub fn extension_dir(app: &AppHandle) -> tauri::Result<PathBuf> {
     Ok(app.path().app_data_dir()?.join("browser-extension"))
 }
 
+/// `version` of the extension bundled with this app (its `manifest.json`).
+/// Connected extensions reporting an older version are outdated.
+pub fn bundled_version(app: &AppHandle) -> Option<String> {
+    static VERSION: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    VERSION
+        .get_or_init(|| {
+            let manifest = app
+                .path()
+                .resolve("extension/manifest.json", BaseDirectory::Resource)
+                .ok()?;
+            manifest_version(&std::fs::read_to_string(manifest).ok()?)
+        })
+        .clone()
+}
+
+fn manifest_version(json: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(json).ok()?;
+    v.get("version")?.as_str().map(str::to_owned)
+}
+
 /// Copy the bundled extension into the app data folder and write the pairing file.
 pub fn prepare(app: &AppHandle) -> Result<PathBuf, String> {
     let src = app
@@ -427,4 +447,25 @@ fn resolve(binary: &str) -> Option<PathBuf> {
     std::env::split_paths(&std::env::var_os("PATH")?)
         .map(|dir| dir.join(binary))
         .find(|p| p.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_the_bundled_manifest_version() {
+        let manifest = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../extension/manifest.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            manifest_version(&manifest).as_deref(),
+            Some(env!("CARGO_PKG_VERSION")),
+            "extension/manifest.json and the app must have the same version"
+        );
+        assert_eq!(manifest_version("{}"), None);
+        assert_eq!(manifest_version("not json"), None);
+    }
 }

@@ -3,11 +3,11 @@
   "name": "DownloadManager Connector",
   "version": "0.3.1",
   "description": "Chuyển các lượt tải từ trình duyệt sang DownloadManager để tải đa luồng, nhanh hơn.",
-  "permissions": ["downloads", "cookies", "contextMenus", "storage"],
+  "permissions": ["downloads", "cookies", "contextMenus", "storage", "webRequest"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",
-    "scripts": ["common.js", "background.js"]
+    "scripts": ["common.js", "media.js", "background.js"]
   },
   "action": {
     "default_title": "DownloadManager",
@@ -19,6 +19,14 @@
       "128": "icons/icon128.png"
     }
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true

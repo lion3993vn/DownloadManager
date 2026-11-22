@@ -4,7 +4,7 @@
 //! `Origin` check (browsers always send it cross-origin and pages cannot fake
 //! an extension origin); captures additionally require the pairing token.
 
-use crate::state::{AppState, Capture, PairRequest};
+use crate::state::{AppState, Capture, ExtensionChange, PairRequest};
 use crate::window::show_main_window;
 use axum::extract::State;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
@@ -23,6 +23,8 @@ const BROWSER_HEADER: &str = "x-dm-browser";
 /// The extension's own origin. Chromium omits `Origin` on GET requests made
 /// by extensions with host permissions, so the ping carries it explicitly.
 const EXTENSION_HEADER: &str = "x-dm-extension";
+/// Version of the extension (`manifest.json`). Older extensions do not send it.
+const VERSION_HEADER: &str = "x-dm-version";
 
 pub fn start(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -66,6 +68,7 @@ fn router(app: AppHandle) -> Router {
             HeaderName::from_static(TOKEN_HEADER),
             HeaderName::from_static(BROWSER_HEADER),
             HeaderName::from_static(EXTENSION_HEADER),
+            HeaderName::from_static(VERSION_HEADER),
         ]);
     Router::new()
         .route("/api/ping", get(ping))
@@ -118,8 +121,18 @@ fn note_extension(app: &AppHandle, headers: &HeaderMap) {
         .get(BROWSER_HEADER)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    if let Some(ext) = app.state::<AppState>().record_extension(origin, browser) {
-        let _ = app.emit("dm://extension-connected", &ext);
+    let version = headers.get(VERSION_HEADER).and_then(|v| v.to_str().ok());
+    match app
+        .state::<AppState>()
+        .record_extension(origin, browser, version)
+    {
+        ExtensionChange::New(ext) => {
+            let _ = app.emit("dm://extension-connected", &ext);
+        }
+        ExtensionChange::Version(ext) => {
+            let _ = app.emit("dm://extension-updated", &ext);
+        }
+        ExtensionChange::Unchanged | ExtensionChange::Touched => {}
     }
 }
 
@@ -143,6 +156,8 @@ async fn ping(State(app): State<AppHandle>, headers: HeaderMap) -> Response {
         "app": "DownloadManager",
         "version": env!("CARGO_PKG_VERSION"),
         "paired": paired,
+        // Lets the extension notice it is older than the one bundled with the app.
+        "extensionVersion": crate::extension_setup::bundled_version(&app),
     }))
     .into_response()
 }
@@ -222,6 +237,7 @@ async fn capture(
         url: c.url,
         file_name: c.file_name,
         headers: c.headers,
+        kind: c.kind,
         ..Default::default()
     }) {
         return error(StatusCode::BAD_REQUEST, &e.to_string());

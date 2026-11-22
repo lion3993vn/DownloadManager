@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, type Capture, type ProbeResult, type RequestHeaders } from "../lib/api";
-import { formatBytes, hostOf, isProbablyUrl } from "../lib/format";
+import { errorText, formatBytes, formatDuration, hostOf, isProbablyUrl, resolutionLabel } from "../lib/format";
 import { Field, Modal } from "./Modal";
 import { FileTile } from "./FileTile";
 import { AlertIcon, BoltIcon, FolderIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
@@ -83,6 +83,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
         connections,
         headers,
         startPaused,
+        kind: stream ? "hls" : (capture?.kind ?? null),
       });
       onAdded(d.fileName, !startPaused);
       onClose();
@@ -94,7 +95,9 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   }
 
   const valid = isProbablyUrl(url);
+  const stream = probe.kind === "ok" ? probe.result.stream : null;
   const size = probe.kind === "ok" ? probe.result.totalSize : (capture?.fileSize ?? null);
+  const blocked = stream?.live ?? false;
   const shownName = fileName || (valid ? "…" : "");
 
   return (
@@ -109,10 +112,10 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           <button className="btn-ghost" onClick={onClose}>
             Hủy
           </button>
-          <button className="btn-outline" disabled={!valid || busy} onClick={() => submit(true)}>
+          <button className="btn-outline" disabled={!valid || busy || blocked} onClick={() => submit(true)}>
             <PlusIcon /> Thêm, tải sau
           </button>
-          <button className="btn-primary min-w-[110px]" disabled={!valid || busy} onClick={() => submit(false)}>
+          <button className="btn-primary min-w-[110px]" disabled={!valid || busy || blocked} onClick={() => submit(false)}>
             <BoltIcon /> Tải ngay
           </button>
         </>
@@ -122,7 +125,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid && !busy) submit(false);
+          if (valid && !busy && !blocked) submit(false);
         }}
       >
         <div className="relative">
@@ -159,11 +162,35 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                 )}
                 {probe.kind === "error" && (
                   <span className="flex items-center gap-1.5 text-red-500">
-                    <AlertIcon /> {probe.message}
+                    <AlertIcon /> {errorText(probe.message)}
                   </span>
                 )}
-                {(probe.kind === "ok" || size != null) && <span className="font-medium text-ink-2">{formatBytes(size)}</span>}
+                {(probe.kind === "ok" || size != null) && (
+                  <span className="font-medium text-ink-2" title={stream ? "Ước tính từ chất lượng video" : undefined}>
+                    {stream && size != null ? "≈ " : ""}
+                    {formatBytes(size)}
+                  </span>
+                )}
+                {stream && (
+                  <>
+                    <span className="rounded-full bg-rose-500/12 px-2 py-px text-[11px] font-medium text-rose-700 dark:text-rose-300">
+                      Video HLS
+                      {resolutionLabel(stream.resolution) ? ` · ${resolutionLabel(stream.resolution)}` : ""}
+                      {stream.live ? "" : ` · ${formatDuration(stream.durationSecs)}`}
+                    </span>
+                    {stream.live ? (
+                      <span className="flex items-center gap-1.5 text-red-500">
+                        <AlertIcon /> Luồng phát trực tiếp, không tải được
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-emerald-500/12 px-2 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                        {stream.segments} đoạn · tạm dừng được{stream.encrypted ? " · đã mã hóa" : ""}
+                      </span>
+                    )}
+                  </>
+                )}
                 {probe.kind === "ok" &&
+                  !stream &&
                   (probe.result.resumable ? (
                     <span className="rounded-full bg-emerald-500/12 px-2 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                       Đa luồng · tạm dừng được

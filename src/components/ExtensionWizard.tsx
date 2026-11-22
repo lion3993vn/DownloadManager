@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { api, type BrowserInfo, type ConnectedExtension, type ExtensionSetupInfo } from "../lib/api";
+import { api, outdatedExtensions, type BrowserInfo, type ConnectedExtension, type ExtensionSetupInfo } from "../lib/api";
 import { Modal } from "./Modal";
 import { CheckCircleIcon, CheckIcon, ClipboardIcon, FolderIcon, GlobeIcon, InfoIcon, OpenIcon, PuzzleIcon } from "./Icons";
 
 interface Props {
   connected: ConnectedExtension[];
+  /** Version bundled with the app: connected extensions below it need a reload. */
+  bundledVersion: string | null;
   onClose: () => void;
   onError: (msg: string) => void;
 }
@@ -70,7 +72,9 @@ const K = ({ children }: { children: ReactNode }) => (
   <span className="rounded-md border border-line bg-panel px-1.5 py-px text-[11.5px] font-medium whitespace-nowrap text-ink-2">{children}</span>
 );
 
-export function ExtensionWizard({ connected, onClose, onError }: Props) {
+export function ExtensionWizard({ connected, bundledVersion, onClose, onError }: Props) {
+  const outdated = outdatedExtensions(connected, bundledVersion);
+  const outdatedFor = (b: BrowserInfo) => outdated.find((e) => e.browser === b.name) ?? null;
   const [info, setInfo] = useState<ExtensionSetupInfo | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
@@ -81,8 +85,9 @@ export function ExtensionWizard({ connected, onClose, onError }: Props) {
       .extensionSetupInfo()
       .then((i) => {
         setInfo(i);
+        const needsUpdate = i.browsers.find((b) => outdated.some((e) => e.browser === b.name));
         const notConnected = i.browsers.find((b) => !connected.some((c) => c.browser === b.name));
-        setSelected((notConnected ?? i.browsers[0])?.id ?? null);
+        setSelected((needsUpdate ?? notConnected ?? i.browsers[0])?.id ?? null);
       })
       .catch((e) => onError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,9 +157,13 @@ export function ExtensionWizard({ connected, onClose, onError }: Props) {
                 <BrowserGlyph b={b} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-ink">{b.name}</span>
-                  <span className={`block text-[11px] ${isConnected(b) ? "text-emerald-600" : "text-mute"}`}>
-                    {isConnected(b) ? "● Đã kết nối" : "Chưa cài"}
-                  </span>
+                  {outdatedFor(b) ? (
+                    <span className="block text-[11px] text-amber-600 dark:text-amber-400">● Cần cập nhật</span>
+                  ) : (
+                    <span className={`block text-[11px] ${isConnected(b) ? "text-emerald-600" : "text-mute"}`}>
+                      {isConnected(b) ? "● Đã kết nối" : "Chưa cài"}
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -164,6 +173,19 @@ export function ExtensionWizard({ connected, onClose, onError }: Props) {
           <div className="min-w-0 p-6">
             {!browser ? (
               <GenericSteps folder={info.folder} copied={copied} onCopy={() => copy(info.folder)} onReveal={reveal} />
+            ) : outdatedFor(browser) ? (
+              <UpdateSteps
+                browser={browser}
+                current={outdatedFor(browser)!.version}
+                latest={bundledVersion!}
+                opened={opened[browser.id]}
+                copied={copied}
+                folder={info.folder}
+                manifestPath={info.manifestPath}
+                onOpen={() => openBrowser(browser)}
+                onCopy={copy}
+                onReveal={reveal}
+              />
             ) : done ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-500">
@@ -255,5 +277,78 @@ function GenericSteps({ folder, copied, onCopy, onReveal }: { folder: string; co
         <PathBox path={folder} copied={copied} onCopy={onCopy} onReveal={onReveal} />
       </Step>
     </ol>
+  );
+}
+
+/**
+ * The extension folder already holds the new version (the app refreshes it on
+ * every start); the browser only has to reload it. Extensions from this
+ * version on reload themselves, so this is needed once.
+ */
+function UpdateSteps(p: {
+  browser: BrowserInfo;
+  current: string | null;
+  latest: string;
+  opened?: boolean;
+  copied: string | null;
+  folder: string;
+  manifestPath: string;
+  onOpen: () => void;
+  onCopy: (text: string) => void;
+  onReveal: () => void;
+}) {
+  const firefox = p.browser.engine === "firefox";
+  return (
+    <div>
+      <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3.5">
+        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="text-[12.5px] leading-relaxed text-ink-2">
+          <b className="font-semibold text-ink">Extension trên {p.browser.name} đã cũ</b>
+          <span className="block text-mute">
+            Đang dùng {p.current ? <K>v{p.current}</K> : "bản cũ"} · bản mới <K>v{p.latest}</K> đã có sẵn trong app, chỉ cần tải lại.
+          </span>
+        </div>
+      </div>
+      <ol>
+        <Step n={1} done={p.opened} title={firefox ? "Mở trang gỡ lỗi tiện ích của Firefox" : `Mở trang tiện ích của ${p.browser.name}`}>
+          <button className="btn-primary mt-0.5" onClick={p.onOpen}>
+            <OpenIcon /> Mở {p.browser.name}
+          </button>
+          {!firefox && (
+            <p className="mt-2">
+              App sẽ chép sẵn địa chỉ <K>{p.browser.extensionsUrl}</K>, dán vào thanh địa chỉ <K>Ctrl V</K> rồi nhấn <K>Enter</K>.
+            </p>
+          )}
+        </Step>
+        <Step
+          n={2}
+          title={
+            firefox ? (
+              <>Bấm <K>Reload</K> ở mục DownloadManager Connector</>
+            ) : (
+              <>Bấm nút tải lại <K>↻</K> trên thẻ DownloadManager Connector</>
+            )
+          }
+        >
+          Từ bản này trở đi, extension tự cập nhật mỗi khi app có bản mới.
+        </Step>
+        <Step n={3} title="Chờ extension báo phiên bản mới">
+          <span className="inline-flex items-center gap-2 text-[12.5px] text-mute">
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
+            Đang chờ… (bấm biểu tượng extension trên thanh công cụ để kết nối ngay)
+          </span>
+          <p className="mt-2">
+            Vẫn báo cũ? Có thể extension được cài từ thư mục khác. Gỡ nó đi rồi cài lại từ{" "}
+            {firefox ? "tệp manifest.json" : "thư mục"} này:
+          </p>
+          <PathBox
+            path={firefox ? p.manifestPath : p.folder}
+            copied={p.copied}
+            onCopy={() => p.onCopy(firefox ? p.manifestPath : p.folder)}
+            onReveal={p.onReveal}
+          />
+        </Step>
+      </ol>
+    </div>
   );
 }

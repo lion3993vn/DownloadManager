@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { formatBytes, formatDate, formatEta, formatSpeed, STATUS_LABEL, STATUS_PILL } from "../lib/format";
+import { errorText, formatBytes, formatDate, formatEta, formatSpeed, STATUS_LABEL, STATUS_PILL } from "../lib/format";
 import type { Row } from "../lib/useDownloads";
 import { FileTile } from "./FileTile";
 import { SegmentBar, SegmentMap } from "./SegmentBar";
@@ -60,7 +60,7 @@ export function DetailsPanel({ row: r, ...a }: Props) {
           <SegmentBar segments={r.liveSegments} total={r.totalSize} downloaded={r.downloaded} status={r.status} height="h-2" />
         </div>
 
-        {r.error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-[12px] break-words text-red-600">{r.error}</p>}
+        {r.error && <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-[12px] break-words text-red-600">{errorText(r.error)}</p>}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           {(r.status === "downloading" || r.status === "queued") && (
@@ -106,11 +106,18 @@ export function DetailsPanel({ row: r, ...a }: Props) {
         )}
 
         <dl className="mt-5 divide-y divide-line text-[12.5px]">
-          <InfoRow label="Kích thước">{formatBytes(r.totalSize)}</InfoRow>
+          <InfoRow label="Kích thước">
+            {/* HLS sizes are estimates until every segment is in. */}
+            {r.kind === "hls" && r.status !== "completed" && r.totalSize != null ? "≈ " : ""}
+            {formatBytes(r.totalSize)}
+          </InfoRow>
           <InfoRow label="Đã tải">{formatBytes(r.status === "completed" ? (r.totalSize ?? r.downloaded) : r.downloaded)}</InfoRow>
           {r.status === "downloading" && <InfoRow label="Còn lại">{formatEta(r.etaSecs)}</InfoRow>}
+          {r.kind === "hls" && <InfoRow label="Loại">Video HLS (ghép từ nhiều đoạn)</InfoRow>}
           <InfoRow label="Kết nối">
-            {r.totalSize == null && r.downloaded === 0 && r.status !== "completed"
+            {r.kind === "hls"
+              ? `${r.connections} luồng · hỗ trợ tạm dừng`
+              : r.totalSize == null && r.downloaded === 0 && r.status !== "completed"
               ? `${r.connections} luồng (chưa kiểm tra máy chủ)`
               : r.resumable
                 ? `${r.connections} luồng · hỗ trợ tạm dừng`

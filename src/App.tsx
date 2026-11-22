@@ -3,7 +3,9 @@ import {
   api,
   onCapture,
   onExtensionConnected,
+  onExtensionUpdated,
   onPairRequest,
+  outdatedExtensions,
   type BridgeStatus,
   type Capture,
   type ConnectedExtension,
@@ -61,6 +63,9 @@ export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
   const [extensions, setExtensions] = useState<ConnectedExtension[]>([]);
+  // Version of the extension bundled with the app; older connected ones get flagged.
+  const [bundledExt, setBundledExt] = useState<string | null>(null);
+  const bundledExtRef = useRef<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
@@ -94,8 +99,19 @@ export default function App() {
     const pullCaptures = () => api.takeCaptures().then((c) => c.length && setCaptures((old) => [...old, ...c]));
     pullCaptures();
     api.pendingPairRequests().then(setPairs);
-    api.connectedExtensions().then((list) => {
+    Promise.all([api.connectedExtensions(), api.extensionVersion().catch(() => null)]).then(([list, bundled]) => {
       setExtensions(list);
+      bundledExtRef.current = bundled;
+      setBundledExt(bundled);
+      const old = outdatedExtensions(list, bundled);
+      if (old.length) {
+        push({
+          kind: "info",
+          title: `Extension trên ${old.map((e) => e.browser).join(", ")} đã cũ`,
+          body: `Bản mới v${bundled} đã có sẵn trong app, chỉ cần tải lại extension.`,
+          action: { label: "Cập nhật", run: () => setShowWizard(true) },
+        });
+      }
       let onboarded = false;
       try {
         onboarded = localStorage.getItem(ONBOARDED_KEY) === "1";
@@ -111,7 +127,22 @@ export default function App() {
       onPairRequest((r) => setPairs((old) => (old.some((p) => p.id === r.id) ? old : [...old, r]))),
       onExtensionConnected((e) => {
         setExtensions((old) => [...old.filter((x) => x.origin !== e.origin), e]);
-        push({ kind: "success", title: `Đã kết nối ${e.browser}`, body: "Lượt tải từ trình duyệt sẽ tự chuyển sang app." });
+        if (outdatedExtensions([e], bundledExtRef.current).length) {
+          push({
+            kind: "info",
+            title: `Đã kết nối ${e.browser}, nhưng extension đã cũ`,
+            body: `Đang dùng ${e.version ? `v${e.version}` : "bản cũ"}, bản mới là v${bundledExtRef.current}.`,
+            action: { label: "Cập nhật", run: () => setShowWizard(true) },
+          });
+        } else {
+          push({ kind: "success", title: `Đã kết nối ${e.browser}`, body: "Lượt tải từ trình duyệt sẽ tự chuyển sang app." });
+        }
+      }),
+      onExtensionUpdated((e) => {
+        setExtensions((old) => [...old.filter((x) => x.origin !== e.origin), e]);
+        if (!outdatedExtensions([e], bundledExtRef.current).length) {
+          push({ kind: "success", title: `Đã cập nhật extension trên ${e.browser}`, body: `Phiên bản v${e.version}` });
+        }
       }),
     ];
     return () => {
@@ -225,6 +256,7 @@ export default function App() {
   const title = filter.kind === "status" ? STATUS_FILTERS.find((f) => f.key === filter.key)!.label : TYPE_FILTERS.find((f) => f.key === filter.key)!.label;
   const hasActive = all.some((r) => r.status === "downloading" || r.status === "queued");
   const hasPaused = all.some((r) => r.status === "paused");
+  const outdated = useMemo(() => outdatedExtensions(extensions, bundledExt), [extensions, bundledExt]);
   const capture = captures[0];
   const pair = pairs[0];
 
@@ -239,6 +271,8 @@ export default function App() {
         statusCounts={statusCounts}
         typeCounts={typeCounts}
         extensions={extensions}
+        outdatedExtensions={outdated}
+        bundledExtension={bundledExt}
         bridgeRunning={bridge?.running ?? false}
         onAdd={() => setShowAdd(true)}
         onSettings={() => setShowSettings(true)}
@@ -342,7 +376,7 @@ export default function App() {
         />
       )}
       {showChangelog && <ChangelogDialog updater={updater} onClose={() => setShowChangelog(false)} onError={showError} />}
-      {showWizard && <ExtensionWizard connected={extensions} onClose={() => setShowWizard(false)} onError={showError} />}
+      {showWizard && <ExtensionWizard connected={extensions} bundledVersion={bundledExt} onClose={() => setShowWizard(false)} onError={showError} />}
       {pair && (
         <PairDialog
           pair={pair}

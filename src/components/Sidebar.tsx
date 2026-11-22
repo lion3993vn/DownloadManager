@@ -45,6 +45,9 @@ interface Props {
   statusCounts: Record<StatusFilter, number>;
   typeCounts: Partial<Record<FileKind, number>>;
   extensions: ConnectedExtension[];
+  /** Connected extensions older than the one bundled with the app. */
+  outdatedExtensions: ConnectedExtension[];
+  bundledExtension: string | null;
   bridgeRunning: boolean;
   onAdd: () => void;
   onSettings: () => void;
@@ -152,6 +155,20 @@ export function Sidebar(p: Props) {
             <span className="min-w-0 flex-1">
               <span className="block text-[12px] font-medium text-ink-2">{p.bridgeRunning ? "Đã kết nối trình duyệt" : "Cầu nối đang tắt"}</span>
               <span className="block truncate text-[11px] text-mute">{browsers.join(", ")}</span>
+            </span>
+          </button>
+        )}
+        {p.outdatedExtensions.length > 0 && (
+          <button
+            onClick={p.onInstallExtension}
+            className="flex w-full items-center gap-2.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-left transition hover:bg-amber-500/15"
+          >
+            <PuzzleIcon className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold text-amber-700 dark:text-amber-300">Cập nhật extension</span>
+              <span className="block truncate text-[11px] text-mute">
+                {p.outdatedExtensions.map((e) => e.browser).join(", ")} · bản mới v{p.bundledExtension}
+              </span>
             </span>
           </button>
         )}

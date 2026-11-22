@@ -6,24 +6,83 @@
   </head>
   <body class="popup">
     <header>
-      <img src="icons/icon32.png" alt="" width="20" height="20" />
-      <strong>DownloadManager</strong>
+      <div class="logo"><img src="icons/icon32.png" alt="" /></div>
+      <div class="brand">
+        <strong>DownloadManager</strong>
+        <span id="subtitle">Tải đa luồng, nhanh hơn</span>
+      </div>
+      <button id="options" class="icon-btn" title="Tùy chọn" aria-label="Tùy chọn">
+        <svg class="i" viewBox="0 0 24 24">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
     </header>
 
-    <div id="status" class="status">Đang kiểm tra…</div>
+    <main>
+      <div id="update" class="status status-card" data-state="warn" hidden>
+        <span class="dot"></span>
+        <div>
+          <div id="update-title" class="title"></div>
+          <div id="update-desc" class="desc"></div>
+        </div>
+      </div>
 
-    <button id="pair" class="primary" hidden>Kết nối với app</button>
+      <div id="status" class="status status-card" data-state="checking">
+        <span class="dot"></span>
+        <div>
+          <div id="status-title" class="title">Đang kiểm tra…</div>
+          <div id="status-desc" class="desc">Đang tìm app DownloadManager trên máy.</div>
+        </div>
+      </div>
 
-    <label class="row">
-      <input type="checkbox" id="enabled" />
-      <span>Tự bắt các lượt tải</span>
-    </label>
+      <button id="pair" class="btn btn-primary btn-block" hidden>
+        <svg class="i" viewBox="0 0 24 24">
+          <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+          <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
+          <line x1="8" x2="16" y1="12" y2="12" />
+        </svg>
+        Kết nối với app
+      </button>
 
-    <button id="skip">Lần tải tới dùng trình duyệt</button>
+      <section class="media">
+        <div class="media-head">
+          <span>Video trên trang này</span>
+          <span id="media-count" class="count" hidden></span>
+        </div>
+        <ul id="media-list" class="media-list"></ul>
+        <div id="media-empty" class="media-empty">
+          Chưa thấy video nào. Hãy bấm phát video trên trang rồi mở lại.
+        </div>
+      </section>
+
+      <div class="settings">
+        <label class="setting">
+          <span class="text">
+            <span class="title">Tự bắt lượt tải</span>
+            <span class="desc" style="display: block">Chuyển tệp phù hợp sang app</span>
+          </span>
+          <span class="switch"><input type="checkbox" id="enabled" /><span class="track"></span></span>
+        </label>
+        <label class="setting" id="skip-row">
+          <span class="text">
+            <span class="title">Bỏ qua lần tải tới</span>
+            <span class="desc" style="display: block">Để trình duyệt tự tải, chỉ một lần</span>
+          </span>
+          <span class="switch"><input type="checkbox" id="skip" /><span class="track"></span></span>
+        </label>
+      </div>
+    </main>
 
     <footer>
-      <a href="#" id="options">Tùy chọn</a>
+      <svg class="i" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4" />
+        <path d="M12 8h.01" />
+      </svg>
+      <span>Mẹo: chuột phải vào liên kết để gửi sang app</span>
     </footer>
+
     <script src="common.js"></script>
     <script src="popup.js"></script>
   </body>

@@ -2,7 +2,7 @@
 // If the app is not running (or refuses), the browser download continues.
 
 if (typeof importScripts === "function" && typeof DM_DEFAULTS === "undefined") {
-  importScripts("common.js"); // Chrome service worker
+  importScripts("common.js", "media.js"); // Chrome service worker
 }
 
 const MB = 1024 * 1024;
@@ -63,12 +63,13 @@ async function cookieHeader(url) {
 }
 
 /** POST a capture to the app; resolves true if the app accepted it. */
-async function sendToApp(s, { url, fileName, fileSize, mime, referrer }) {
+async function sendToApp(s, { url, fileName, fileSize, mime, referrer, kind }) {
   const payload = {
     url,
     fileName: fileName || null,
     fileSize: fileSize > 0 ? fileSize : null,
     mime: mime || null,
+    kind: kind || null,
     referrer: referrer || null,
     userAgent: navigator.userAgent,
     cookies: await cookieHeader(url),
@@ -102,11 +103,16 @@ async function pairedSettings() {
   return r.paired ? r.settings : null;
 }
 
-async function flashBadge(text, color) {
+/** Briefly show ✓ / ! on the toolbar icon; with a tab, then restore its video count. */
+async function flashBadge(text, color, tabId) {
+  const scope = tabId != null ? { tabId } : {};
   try {
-    await ext.action.setBadgeBackgroundColor({ color });
-    await ext.action.setBadgeText({ text });
-    setTimeout(() => ext.action.setBadgeText({ text: "" }), 4000);
+    await ext.action.setBadgeBackgroundColor({ ...scope, color });
+    await ext.action.setBadgeText({ ...scope, text });
+    setTimeout(() => {
+      if (tabId != null) mediaBadge(tabId);
+      else ext.action.setBadgeText({ text: "" });
+    }, 4000);
   } catch {
     /* ignore */
   }
@@ -170,21 +176,38 @@ function createMenu() {
 function onBoot() {
   createMenu();
   dmEnsurePaired().catch(() => {});
+  dmSelfUpdate().catch(() => {});
 }
+
+// The app may refresh the extension folder while the browser keeps running;
+// check for newer files now and then (page loads wake the worker anyway).
+let lastSelfUpdateCheck = 0;
+ext.tabs.onUpdated.addListener((_tabId, info) => {
+  if (info.status !== "complete" || Date.now() - lastSelfUpdateCheck < 5 * 60 * 1000) return;
+  lastSelfUpdateCheck = Date.now();
+  dmSelfUpdate().catch(() => {});
+});
 ext.runtime.onInstalled.addListener(onBoot);
 ext.runtime.onStartup?.addListener(onBoot);
 
 ext.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
   const url = info.linkUrl || info.srcUrl;
-  if (!url || !/^https?:\/\//i.test(url)) return;
   const s = await pairedSettings();
   if (!s) {
     ext.runtime.openOptionsPage();
     return;
   }
+  // Streaming players play from blob: URLs; use the stream found on the page.
+  if (url && /^blob:/i.test(url) && tab && /^(video|audio)$/.test(info.mediaType || "")) {
+    const item = await mediaForElement(tab.id, info.frameId ?? 0, null);
+    if (item) mediaSend(tab.id, item);
+    else flashBadge("!", "#dc2626", tab.id);
+    return;
+  }
+  if (!url || !/^https?:\/\//i.test(url)) return;
   const ok = await sendToApp(s, { url, referrer: info.pageUrl || tab?.url });
-  flashBadge(ok ? "✓" : "!", ok ? "#16a34a" : "#dc2626");
+  flashBadge(ok ? "✓" : "!", ok ? "#16a34a" : "#dc2626", tab?.id);
 });
 
 // Pairing runs here (not in the popup) because the popup closes as soon as

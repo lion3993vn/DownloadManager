@@ -114,3 +114,37 @@ export const STATUS_PILL: Record<Status, string> = {
 export function isProbablyUrl(text: string): boolean {
   return /^https?:\/\/\S+$/i.test(text.trim());
 }
+
+/** 2895 -> "48:15", 4000 -> "1:06:40". */
+export function formatDuration(secs: number | null | undefined): string {
+  if (secs == null || !Number.isFinite(secs) || secs <= 0) return "—";
+  const s = Math.round(secs);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+/** "1280×720" -> "720p" style label. */
+export function resolutionLabel(res: [number, number] | null | undefined): string | null {
+  if (!res) return null;
+  const [w, h] = res;
+  const short = Math.min(w, h);
+  return short >= 2160 ? "4K" : `${short}p`;
+}
+
+/** Engine errors are English; translate the ones users can act on. */
+const ERROR_TEXT: [RegExp, string][] = [
+  [/live streams cannot be downloaded/i, "Đây là luồng phát trực tiếp, không tải được."],
+  [/protected with .*\(DRM\)/i, "Video được bảo vệ bản quyền (DRM), không tải được."],
+  [/audio is a separate stream/i, "Video này tách riêng tiếng và hình, chưa được hỗ trợ."],
+  [/not an HLS playlist/i, "Liên kết không phải danh sách phát HLS hợp lệ."],
+  [/could not decrypt a segment/i, "Không giải mã được video (sai khóa?)."],
+  [/server responded with HTTP 403/i, "Máy chủ từ chối truy cập (HTTP 403). Liên kết có thể đã hết hạn."],
+];
+
+export function errorText(message: string | null | undefined): string {
+  if (!message) return "";
+  for (const [re, text] of ERROR_TEXT) if (re.test(message)) return text;
+  return message;
+}

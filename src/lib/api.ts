@@ -9,9 +9,12 @@ export interface SegmentInfo {
   done: number;
 }
 
+export type DownloadKind = "file" | "hls";
+
 export interface DownloadInfo {
   id: number;
   url: string;
+  kind: DownloadKind;
   fileName: string;
   saveDir: string;
   totalSize: number | null;
@@ -54,6 +57,7 @@ export interface NewDownload {
   connections?: number | null;
   headers?: RequestHeaders;
   startPaused?: boolean;
+  kind?: DownloadKind | null;
 }
 
 export interface ProbeResult {
@@ -62,6 +66,19 @@ export interface ProbeResult {
   fileName: string;
   contentType: string | null;
   finalUrl: string;
+  stream: StreamInfo | null;
+}
+
+/** An HLS video stream (see `dm_core::StreamInfo`). */
+export interface StreamInfo {
+  durationSecs: number;
+  segments: number;
+  resolution: [number, number] | null;
+  bandwidth: number | null;
+  estimatedSize: number | null;
+  live: boolean;
+  encrypted: boolean;
+  container: string;
 }
 
 export interface EngineSettings {
@@ -97,6 +114,7 @@ export interface Capture extends RequestHeaders {
   fileName?: string | null;
   fileSize?: number | null;
   mime?: string | null;
+  kind?: DownloadKind | null;
 }
 
 export interface PairRequest {
@@ -122,6 +140,8 @@ export interface ConnectedExtension {
   origin: string;
   browser: string;
   lastSeen: number;
+  /** `null`: an old extension that does not report its version. */
+  version: string | null;
 }
 
 export interface AvailableUpdate {
@@ -170,6 +190,7 @@ export const api = {
   answerPairRequest: (id: number, approve: boolean) => invoke<void>("answer_pair_request", { id, approve }),
   extensionSetupInfo: () => invoke<ExtensionSetupInfo>("extension_setup_info"),
   connectedExtensions: () => invoke<ConnectedExtension[]>("connected_extensions"),
+  extensionVersion: () => invoke<string | null>("extension_version"),
   openBrowserExtensions: (browserId: string) => invoke<void>("open_browser_extensions", { browserId }),
   revealExtensionFolder: () => invoke<void>("reveal_extension_folder"),
   checkUpdate: () => invoke<UpdateStatus>("check_update"),
@@ -189,6 +210,9 @@ export const onPairRequest = (cb: (r: PairRequest) => void): Promise<UnlistenFn>
 export const onExtensionConnected = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
   listen<ConnectedExtension>("dm://extension-connected", (e) => cb(e.payload));
 
+export const onExtensionUpdated = (cb: (e: ConnectedExtension) => void): Promise<UnlistenFn> =>
+  listen<ConnectedExtension>("dm://extension-updated", (e) => cb(e.payload));
+
 export const onUpdateAvailable = (cb: (u: AvailableUpdate) => void): Promise<UnlistenFn> =>
   listen<AvailableUpdate>("dm://update-available", (e) => cb(e.payload));
 
@@ -206,4 +230,19 @@ export function compareVersions(a: string, b: string): number {
     if (d) return d;
   }
   return 0;
+}
+
+/**
+ * Browsers whose extension is older than the one bundled with the app. Only the
+ * most recently seen extension of each browser counts, so a removed old copy
+ * does not keep warning forever.
+ */
+export function outdatedExtensions(list: ConnectedExtension[], bundled: string | null): ConnectedExtension[] {
+  if (!bundled) return [];
+  const latest = new Map<string, ConnectedExtension>();
+  for (const e of list) {
+    const known = latest.get(e.browser);
+    if (!known || e.lastSeen > known.lastSeen) latest.set(e.browser, e);
+  }
+  return [...latest.values()].filter((e) => !e.version || compareVersions(bundled, e.version) > 0);
 }

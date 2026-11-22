@@ -1,6 +1,6 @@
 //! Shared application state and app-level (non-engine) settings.
 
-use dm_core::{Engine, RequestHeaders};
+use dm_core::{DownloadKind, Engine, RequestHeaders};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -79,6 +79,9 @@ pub struct Capture {
     pub file_name: Option<String>,
     pub file_size: Option<u64>,
     pub mime: Option<String>,
+    /// `hls` for a video stream the extension found on the page.
+    #[serde(default)]
+    pub kind: Option<DownloadKind>,
     #[serde(flatten)]
     pub headers: RequestHeaders,
 }
@@ -103,13 +106,75 @@ pub struct AppState {
     next_id: AtomicU64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectedExtension {
     pub origin: String,
     pub browser: String,
     /// Unix epoch milliseconds.
     pub last_seen: i64,
+    /// `X-DM-Version` of the extension. `None`: an extension released before
+    /// version reporting was added, so it is outdated.
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// What [`AppState::record_extension`] changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExtensionChange {
+    /// Seen very recently, nothing to store (pings are frequent).
+    Unchanged,
+    /// `last_seen` / browser name refreshed: store it, nothing to announce.
+    Touched,
+    /// First time this extension talked to us.
+    New(ConnectedExtension),
+    /// Known extension, now running another version (the user updated it).
+    Version(ConnectedExtension),
+}
+
+/// Merge a request from `origin` into the known extensions.
+fn merge_extension(
+    list: &mut Vec<ConnectedExtension>,
+    origin: &str,
+    browser: &str,
+    version: Option<&str>,
+    now: i64,
+) -> ExtensionChange {
+    let version = version
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_owned);
+    let Some(e) = list.iter_mut().find(|e| e.origin == origin) else {
+        let browser = match browser.trim() {
+            "" => "Trình duyệt",
+            b => b,
+        };
+        let ext = ConnectedExtension {
+            origin: origin.to_string(),
+            browser: browser.to_string(),
+            last_seen: now,
+            version,
+        };
+        list.push(ext.clone());
+        return ExtensionChange::New(ext);
+    };
+    // A request without the browser header must not erase a known name.
+    let browser = match browser.trim() {
+        "" => e.browser.clone(),
+        b => b.to_string(),
+    };
+    let version_changed = e.version != version;
+    if !version_changed && now - e.last_seen < 60_000 && e.browser == browser {
+        return ExtensionChange::Unchanged;
+    }
+    e.last_seen = now;
+    e.browser = browser;
+    e.version = version;
+    if version_changed {
+        ExtensionChange::Version(e.clone())
+    } else {
+        ExtensionChange::Touched
+    }
 }
 
 impl AppState {
@@ -132,48 +197,26 @@ impl AppState {
         }
     }
 
-    /// Remember an extension; returns it if it was not known before.
-    pub fn record_extension(&self, origin: &str, browser: &str) -> Option<ConnectedExtension> {
+    /// Remember an extension that talked to us and its version.
+    pub fn record_extension(
+        &self,
+        origin: &str,
+        browser: &str,
+        version: Option<&str>,
+    ) -> ExtensionChange {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
         let mut list = self.extensions.lock().unwrap();
-        let existing = list
-            .iter()
-            .find(|e| e.origin == origin)
-            .map(|e| e.browser.clone());
-        // A request without the browser header must not erase a known name.
-        let browser = match (browser.trim(), existing) {
-            ("", Some(known)) => known,
-            ("", None) => "Trình duyệt".to_string(),
-            (b, _) => b.to_string(),
-        };
-        let browser = browser.as_str();
-        let is_new = match list.iter_mut().find(|e| e.origin == origin) {
-            Some(e) => {
-                // Avoid a database write on every ping.
-                if now - e.last_seen < 60_000 && e.browser == browser {
-                    return None;
-                }
-                e.last_seen = now;
-                e.browser = browser.to_string();
-                false
-            }
-            None => {
-                list.push(ConnectedExtension {
-                    origin: origin.to_string(),
-                    browser: browser.to_string(),
-                    last_seen: now,
-                });
-                true
-            }
-        };
-        let _ = self.engine.set_kv(
-            EXTENSIONS_KEY,
-            &serde_json::to_string(&*list).expect("serializable"),
-        );
-        is_new.then(|| list.last().cloned()).flatten()
+        let change = merge_extension(&mut list, origin, browser, version, now);
+        if change != ExtensionChange::Unchanged {
+            let _ = self.engine.set_kv(
+                EXTENSIONS_KEY,
+                &serde_json::to_string(&*list).expect("serializable"),
+            );
+        }
+        change
     }
 
     pub fn next_id(&self) -> u64 {
@@ -182,5 +225,68 @@ impl AppState {
 
     pub fn app_settings(&self) -> AppSettings {
         self.settings.read().unwrap().clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capture_kind_is_optional() {
+        let old: Capture = serde_json::from_str(r#"{"url":"https://a.com/x.zip","fileName":null,"fileSize":null,"mime":null,"referrer":null}"#).unwrap();
+        assert_eq!(old.kind, None);
+        let hls: Capture =
+            serde_json::from_str(r#"{"url":"https://a.com/v.m3u8","kind":"hls","cookies":"a=1"}"#)
+                .unwrap();
+        assert_eq!(hls.kind, Some(DownloadKind::Hls));
+        assert_eq!(hls.headers.cookies.as_deref(), Some("a=1"));
+    }
+
+    #[test]
+    fn extensions_saved_before_versions_load_as_unversioned() {
+        let old: Vec<ConnectedExtension> = serde_json::from_str(
+            r#"[{"origin":"chrome-extension://a","browser":"Google Chrome","lastSeen":1}]"#,
+        )
+        .unwrap();
+        assert_eq!(old[0].version, None);
+    }
+
+    #[test]
+    fn merging_extensions() {
+        const O: &str = "chrome-extension://abc";
+        let mut list = Vec::new();
+
+        // Extensions from before version reporting send none.
+        let c = merge_extension(&mut list, O, "Google Chrome", None, 0);
+        assert!(matches!(c, ExtensionChange::New(ref e) if e.version.is_none()));
+
+        // Frequent pings are not stored again...
+        assert_eq!(
+            merge_extension(&mut list, O, "Google Chrome", None, 10_000),
+            ExtensionChange::Unchanged
+        );
+        // ...except once a minute, silently.
+        assert_eq!(
+            merge_extension(&mut list, O, "", None, 70_000),
+            ExtensionChange::Touched
+        );
+        assert_eq!(
+            list[0].browser, "Google Chrome",
+            "empty name keeps the known one"
+        );
+
+        // The user reloaded the extension: announced right away.
+        let c = merge_extension(&mut list, O, "Google Chrome", Some("0.3.2"), 71_000);
+        assert!(
+            matches!(c, ExtensionChange::Version(ref e) if e.version.as_deref() == Some("0.3.2"))
+        );
+        assert_eq!(list.len(), 1);
+
+        // Blank header counts as no version.
+        let c = merge_extension(&mut list, "moz-extension://x", "", Some("  "), 0);
+        assert!(
+            matches!(c, ExtensionChange::New(ref e) if e.version.is_none() && e.browser == "Trình duyệt")
+        );
     }
 }

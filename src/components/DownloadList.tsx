@@ -1,4 +1,4 @@
-import { formatBytes, formatEta, formatRelative, formatSpeed, hostOf, STATUS_LABEL, STATUS_PILL } from "../lib/format";
+import { errorText, formatBytes, formatEta, formatRelative, formatSpeed, hostOf, STATUS_LABEL, STATUS_PILL } from "../lib/format";
 import type { Row } from "../lib/useDownloads";
 import { FileTile } from "./FileTile";
 import { SegmentBar } from "./SegmentBar";
@@ -65,7 +65,7 @@ function Meta({ r }: { r: Row }) {
     );
   }
   if (r.status === "failed" && r.error) {
-    return <span className="truncate text-red-500">{r.error}</span>;
+    return <span className="truncate text-red-500">{errorText(r.error)}</span>;
   }
   if (r.downloaded === 0 && r.totalSize == null && (r.status === "paused" || r.status === "queued")) {
     return (

@@ -14,6 +14,8 @@ const DM_DEFAULTS = {
     "mp4 mkv avi mov wmv flv webm m4v mp3 flac wav aac m4a ogg pdf epub",
   // Also capture anything at least this big (MB); 0 disables.
   minSizeMB: 20,
+  // Show a "download" button over videos on web pages.
+  showVideoButton: true,
   // Let the browser handle the next download (one-shot bypass).
   skipNext: false,
 };
@@ -46,22 +48,24 @@ function dmHeaders(s, extra = {}) {
     // Chromium drops the Origin header on GET requests from extensions with
     // host permissions; tell the app who we are explicitly.
     "X-DM-Extension": new URL(ext.runtime.getURL("")).origin,
+    // Lets the app flag extensions older than the one it ships with.
+    "X-DM-Version": ext.runtime.getManifest().version,
     ...extra,
   };
 }
 
-/** -> { running: bool, paired: bool } */
+/** -> { running: bool, paired: bool, extensionVersion: string | null } */
 async function dmPing(s) {
   try {
     const res = await fetch(`${dmBase(s)}/api/ping`, {
       headers: dmHeaders(s),
       signal: AbortSignal.timeout(1500),
     });
-    if (!res.ok) return { running: false, paired: false };
+    if (!res.ok) return { running: false, paired: false, extensionVersion: null };
     const body = await res.json();
-    return { running: true, paired: Boolean(body.paired) };
+    return { running: true, paired: Boolean(body.paired), extensionVersion: body.extensionVersion || null };
   } catch {
-    return { running: false, paired: false };
+    return { running: false, paired: false, extensionVersion: null };
   }
 }
 
@@ -92,4 +96,45 @@ async function dmEnsurePaired() {
     status = await dmPing(s);
   }
   return { ...status, settings: s };
+}
+
+/** Compare dotted versions numerically: >0 if a is newer than b. */
+function dmCompareVersions(a, b) {
+  const pa = String(a).split(".").map((x) => parseInt(x, 10) || 0);
+  const pb = String(b).split(".").map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+/** Version in the manifest.json on disk (may be newer than the running one). */
+async function dmDiskVersion() {
+  try {
+    const res = await fetch(ext.runtime.getURL("manifest.json"), { cache: "no-store" });
+    return res.ok ? (await res.json()).version || null : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The app rewrites the unpacked extension folder with the version it ships on
+ * every start. When the files on disk are newer than what is running, reload
+ * to pick them up. Store installs never differ, so they never reload.
+ * Returns the version being reloaded into, or null.
+ */
+async function dmSelfUpdate() {
+  const running = ext.runtime.getManifest().version;
+  const disk = await dmDiskVersion();
+  if (!disk || dmCompareVersions(disk, running) <= 0) return null;
+  // Guard against a reload loop if the browser keeps loading the old files.
+  const { dmReloadedFor } = await ext.storage.local.get("dmReloadedFor");
+  if (dmReloadedFor && dmReloadedFor.version === disk && Date.now() - dmReloadedFor.at < 10 * 60 * 1000) {
+    return null;
+  }
+  await ext.storage.local.set({ dmReloadedFor: { version: disk, at: Date.now() } });
+  setTimeout(() => ext.runtime.reload(), 300);
+  return disk;
 }

@@ -64,6 +64,7 @@ pub fn run() {
             commands::answer_pair_request,
             commands::extension_setup_info,
             commands::connected_extensions,
+            commands::extension_version,
             commands::open_browser_extensions,
             commands::reveal_extension_folder,
             commands::check_update,
