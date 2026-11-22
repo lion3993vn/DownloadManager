@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-22
+
 ### 🐛 Sửa lỗi
 - **Douyin tải được thật.** Bản 0.4.3 báo *"Trang này cần cookie…"*, kể cả khi gửi từ extension, vì Douyin chặn yt-dlp. Giờ extension lấy link video H.264 ngay từ trang Douyin đang mở, và app tải link đó bằng nhiều luồng. Video mở được ngay bằng Media Player. Cách dùng: mở video trên douyin.com, đợi video phát, rồi bấm nút **Tải video** trên video hoặc "Gửi sang app" trong popup.
 
@@ -126,7 +128,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.4
 [0.4.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.3
 [0.4.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.2
 [0.4.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.1
