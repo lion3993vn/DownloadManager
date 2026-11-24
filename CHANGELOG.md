@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-24
+
 ### ✨ Tính năng mới
 - **Khởi động cùng hệ thống.** Bật trong *Cài đặt → Giao diện*. App tự chạy khi đăng nhập máy, nằm sẵn dưới khay hệ thống (không mở cửa sổ) để tiếp tục các lượt tải dở và nhận link từ trình duyệt. Gỡ cài đặt app sẽ tự xóa mục khởi động này.
 
@@ -131,7 +133,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.0
 [0.4.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.4
 [0.4.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.3
 [0.4.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.2
