@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use dm_core::{DownloadKind, Engine, NewDownload, Status};
+use dm_core::{DownloadKind, Engine, EngineEvent, NewDownload, Status};
 
 const MB: usize = 1024 * 1024;
 
@@ -109,7 +109,12 @@ async fn playlist_without_extension_is_detected() {
     let engine = Engine::in_memory(settings(dir.path())).unwrap();
     let mut events = engine.subscribe();
     let added = add(&engine, server.url("hls/noext"));
-    assert_eq!(added.kind, DownloadKind::File);
+    // Check the kind in the `Added` event: `add` returns a fresh snapshot, and
+    // the transfer may already have probed the URL and switched it to HLS.
+    match events.recv().await.unwrap() {
+        EngineEvent::Added { download } => assert_eq!(download.kind, DownloadKind::File),
+        e => panic!("expected Added first, got {e:?}"),
+    }
 
     let d = wait_done(&engine, &mut events, added.id).await;
     assert_eq!(d.kind, DownloadKind::Hls);
