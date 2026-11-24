@@ -1,3 +1,4 @@
+mod autostart;
 mod bridge;
 mod commands;
 mod extension_setup;
@@ -38,6 +39,11 @@ pub fn run() {
             tray::setup(app.handle())?;
             updater::spawn_periodic_check(app.handle().clone());
             media_tools::start(app.handle());
+            // The window is created hidden (`visible: false`); a launch at
+            // login stays in the tray.
+            if !autostart::launched_at_login() {
+                window::show_main_window(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

@@ -18,7 +18,8 @@
         "height": 760,
         "minWidth": 900,
         "minHeight": 560,
-        "center": true
+        "center": true,
+        "visible": false
       }
     ],
     "security": {
@@ -53,7 +54,8 @@
         "installerIcon": "icons/icon.ico",
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp",
-        "startMenuFolder": "DownloadManager"
+        "startMenuFolder": "DownloadManager",
+        "installerHooks": "installer/hooks.nsh"
       }
     },
     "createUpdaterArtifacts": true

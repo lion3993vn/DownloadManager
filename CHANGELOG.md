@@ -6,6 +6,9 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+- **Khởi động cùng hệ thống.** Bật trong *Cài đặt → Giao diện*. App tự chạy khi đăng nhập máy, nằm sẵn dưới khay hệ thống (không mở cửa sổ) để tiếp tục các lượt tải dở và nhận link từ trình duyệt. Gỡ cài đặt app sẽ tự xóa mục khởi động này.
+
 ## [0.4.4] - 2026-11-22
 
 ### 🐛 Sửa lỗi

@@ -274,6 +274,9 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                 </div>
               </Field>
               <div className="mt-3">
+                <Row title="Khởi động cùng hệ thống" hint="Tự chạy khi đăng nhập máy, ẩn dưới khay hệ thống để tiếp tục các lượt tải dở.">
+                  <Switch checked={s.autostart} onChange={(v) => setS({ ...s, autostart: v })} />
+                </Row>
                 <Row title="Chạy nền khi đóng cửa sổ" hint="Thu nhỏ xuống khay hệ thống để vẫn tải và bắt link từ trình duyệt.">
                   <Switch checked={s.app.closeToTray} onChange={(v) => setApp({ closeToTray: v })} />
                 </Row>

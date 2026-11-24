@@ -90,6 +90,7 @@ Cargo workspace members: `crates/dm-core` (engine, no Tauri dependency), `crates
   - `yt-dlp -U` runs once a day.
   - Progress events are sent as `dm://tools-progress`.
   - Commands: `media_tools_status` / `install_media_tools` / `update_media_tools` / `remove_media_tools`.
+- **`autostart.rs`**: "start with the system" through the `auto-launch` crate (HKCU `Run` value `DownloadManager` on Windows, a LaunchAgent on macOS, XDG autostart on Linux). The OS entry is the source of truth: `SettingsDto.autostart` is read from it, not stored in `kv`. The entry passes `--autostart`; the main window is created with `visible: false` and setup shows it unless that flag is present, so a login launch stays in the tray. The NSIS uninstaller deletes the value (`src-tauri/installer/hooks.nsh`, skipped in update mode).
 - **`extension_setup.rs`**
   - The installer bundles `extension/` as a Tauri resource (`bundle.resources` in `tauri.conf.json`). At startup the app copies it to `app_data/browser-extension/` and writes `pairing.json` (token + port), so the unpacked extension pairs itself. `regenerate_token` rewrites that file.
   - It detects installed browsers. Chromium browsers refuse `chrome://` URLs passed on the command line, so the app launches them with `--new-window --profile-directory=<last_used from "Local State">` and the UI copies `chrome://extensions` to the clipboard. Firefox accepts `about:debugging` directly.

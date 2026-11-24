@@ -141,6 +141,8 @@ export interface AppSettings {
 export interface Settings {
   engine: EngineSettings;
   app: AppSettings;
+  /** Launch at login (read from the OS). */
+  autostart: boolean;
 }
 
 export interface BridgeStatus {

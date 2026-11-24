@@ -1,5 +1,6 @@
 //! Commands invoked from the React UI.
 
+use crate::autostart;
 use crate::extension_setup::{self, ExtensionSetupInfo};
 use crate::state::{
     new_token, AppSettings, AppState, BridgeStatus, Capture, ConnectedExtension, PairRequest,
@@ -105,6 +106,9 @@ pub fn show_in_folder(app: AppHandle, state: State<'_, AppState>, id: DownloadId
 pub struct SettingsDto {
     pub engine: EngineSettings,
     pub app: AppSettings,
+    /// Launch at login. Read from (and written to) the OS, not the database.
+    #[serde(default)]
+    pub autostart: bool,
 }
 
 #[tauri::command]
@@ -112,6 +116,7 @@ pub fn get_settings(state: State<'_, AppState>) -> SettingsDto {
     SettingsDto {
         engine: state.engine.settings(),
         app: state.app_settings(),
+        autostart: autostart::is_enabled(),
     }
 }
 
@@ -124,6 +129,9 @@ pub fn save_settings(state: State<'_, AppState>, settings: SettingsDto) -> CmdRe
         app.confirm_captures = settings.app.confirm_captures;
         app.close_to_tray = settings.app.close_to_tray;
         app.save(&state.engine);
+    }
+    if settings.autostart != autostart::is_enabled() {
+        autostart::set_enabled(settings.autostart)?;
     }
     Ok(get_settings(state))
 }
