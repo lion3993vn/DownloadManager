@@ -256,14 +256,14 @@ export function Sidebar(p: Props) {
         {p.outdatedExtensions.length > 0 && (
           <RailButton
             collapsed={c}
-            title={`Cập nhật extension: ${p.outdatedExtensions.map((e) => e.browser).join(", ")}`}
+            title={`Đang cập nhật extension: ${p.outdatedExtensions.map((e) => e.browser).join(", ")}`}
             icon={<PuzzleIcon className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />}
             onClick={p.onInstallExtension}
             className="border border-amber-500/35 bg-amber-500/10 hover:bg-amber-500/15"
           >
-            <span className="block truncate text-[12px] font-semibold text-amber-700 dark:text-amber-300">Cập nhật extension</span>
+            <span className="block truncate text-[12px] font-semibold text-amber-700 dark:text-amber-300">Đang cập nhật extension</span>
             <span className="block truncate text-[11px] text-mute">
-              {p.outdatedExtensions.map((e) => e.browser).join(", ")} · bản mới v{p.bundledExtension}
+              {p.outdatedExtensions.map((e) => e.browser).join(", ")} · lên v{p.bundledExtension}
             </span>
           </RailButton>
         )}

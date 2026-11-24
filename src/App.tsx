@@ -128,9 +128,9 @@ export default function App() {
       if (old.length) {
         push({
           kind: "info",
-          title: `Extension trên ${old.map((e) => e.browser).join(", ")} đã cũ`,
-          body: `Bản mới v${bundled} đã có sẵn trong app, chỉ cần tải lại extension.`,
-          action: { label: "Cập nhật", run: () => setShowWizard(true) },
+          title: `Đang cập nhật extension trên ${old.map((e) => e.browser).join(", ")}`,
+          body: `Extension sẽ tự nạp bản v${bundled} trong giây lát khi trình duyệt đang mở.`,
+          action: { label: "Chi tiết", run: () => setShowWizard(true) },
         });
       }
       let onboarded = false;
@@ -151,9 +151,9 @@ export default function App() {
         if (outdatedExtensions([e], bundledExtRef.current).length) {
           push({
             kind: "info",
-            title: `Đã kết nối ${e.browser}, nhưng extension đã cũ`,
-            body: `Đang dùng ${e.version ? `v${e.version}` : "bản cũ"}, bản mới là v${bundledExtRef.current}.`,
-            action: { label: "Cập nhật", run: () => setShowWizard(true) },
+            title: `Đã kết nối ${e.browser}, extension đang tự cập nhật`,
+            body: `${e.version ? `v${e.version}` : "Bản cũ"} → v${bundledExtRef.current}, thường xong trong khoảng 30 giây.`,
+            action: { label: "Chi tiết", run: () => setShowWizard(true) },
           });
         } else {
           push({ kind: "success", title: `Đã kết nối ${e.browser}`, body: "Lượt tải từ trình duyệt sẽ tự chuyển sang app." });

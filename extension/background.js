@@ -190,6 +190,19 @@ ext.tabs.onUpdated.addListener((_tabId, info) => {
 ext.runtime.onInstalled.addListener(onBoot);
 ext.runtime.onStartup?.addListener(onBoot);
 
+// Also check on a timer, so a new version is picked up within about 30 s of
+// the app refreshing the folder, without a page load or a manual reload.
+// (Browsers may round the period up; Chrome's minimum is 30 s.)
+const SELF_UPDATE_ALARM = "dm-self-update";
+if (ext.alarms) {
+  ext.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === SELF_UPDATE_ALARM) dmSelfUpdate().catch(() => {});
+  });
+  Promise.resolve(ext.alarms.get(SELF_UPDATE_ALARM))
+    .then((a) => a || ext.alarms.create(SELF_UPDATE_ALARM, { periodInMinutes: 0.5 }))
+    .catch(() => {});
+}
+
 ext.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== MENU_ID) return;
   const url = info.linkUrl || info.srcUrl;

@@ -280,10 +280,15 @@ function GenericSteps({ folder, copied, onCopy, onReveal }: { folder: string; co
   );
 }
 
+/** After this long without the new version, show the manual steps. */
+const MANUAL_UPDATE_AFTER_MS = 60_000;
+
 /**
  * The extension folder already holds the new version (the app refreshes it on
- * every start); the browser only has to reload it. Extensions from this
- * version on reload themselves, so this is needed once.
+ * every start). The extension notices the newer files on disk and reloads
+ * itself (`dmSelfUpdate`: every 30 s, on page loads and when the popup opens),
+ * so this panel mostly waits. The manual reload is the fallback, for very old
+ * extensions or a copy installed from another folder.
  */
 function UpdateSteps(p: {
   browser: BrowserInfo;
@@ -298,17 +303,46 @@ function UpdateSteps(p: {
   onReveal: () => void;
 }) {
   const firefox = p.browser.engine === "firefox";
+  const [manual, setManual] = useState(false);
+  useEffect(() => {
+    setManual(false);
+    const t = setTimeout(() => setManual(true), MANUAL_UPDATE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [p.browser.id]);
+
   return (
     <div>
-      <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3.5">
-        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="mb-5 flex items-start gap-3 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
+        <span className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
         <div className="text-[12.5px] leading-relaxed text-ink-2">
-          <b className="font-semibold text-ink">Extension trên {p.browser.name} đã cũ</b>
+          <b className="font-semibold text-ink">Extension trên {p.browser.name} đang tự cập nhật</b>
           <span className="block text-mute">
-            Đang dùng {p.current ? <K>v{p.current}</K> : "bản cũ"} · bản mới <K>v{p.latest}</K> đã có sẵn trong app, chỉ cần tải lại.
+            {p.current ? <K>v{p.current}</K> : "Bản cũ"} → <K>v{p.latest}</K> · không cần làm gì, thường xong trong khoảng 30 giây khi{" "}
+            {p.browser.name} đang mở.
+          </span>
+          <span className="mt-1.5 block text-mute">
+            Muốn nhanh hơn: mở hoặc tải lại một trang web bất kỳ trong {p.browser.name}, hoặc bấm biểu tượng{" "}
+            <b className="font-medium text-ink-2">DownloadManager</b> trên thanh công cụ.
           </span>
         </div>
       </div>
+      {!manual ? (
+        <button className="btn-ghost px-2 py-1 text-[12px] text-mute" onClick={() => setManual(true)}>
+          Chưa thấy cập nhật? Làm thủ công
+        </button>
+      ) : (
+        <ManualUpdateSteps {...p} firefox={firefox} />
+      )}
+    </div>
+  );
+}
+
+/** The old flow: reload the extension by hand in the browser's extension page. */
+function ManualUpdateSteps(p: Parameters<typeof UpdateSteps>[0] & { firefox: boolean }) {
+  const firefox = p.firefox;
+  return (
+    <div>
+      <p className="mb-3 text-[12.5px] text-mute">Vẫn chưa được? Tải lại extension bằng tay (chỉ cần một lần):</p>
       <ol>
         <Step n={1} done={p.opened} title={firefox ? "Mở trang gỡ lỗi tiện ích của Firefox" : `Mở trang tiện ích của ${p.browser.name}`}>
           <button className="btn-primary mt-0.5" onClick={p.onOpen}>
@@ -333,11 +367,7 @@ function UpdateSteps(p: {
           Từ bản này trở đi, extension tự cập nhật mỗi khi app có bản mới.
         </Step>
         <Step n={3} title="Chờ extension báo phiên bản mới">
-          <span className="inline-flex items-center gap-2 text-[12.5px] text-mute">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
-            Đang chờ… (bấm biểu tượng extension trên thanh công cụ để kết nối ngay)
-          </span>
-          <p className="mt-2">
+          <p>
             Vẫn báo cũ? Có thể extension được cài từ thư mục khác. Gỡ nó đi rồi cài lại từ{" "}
             {firefox ? "tệp manifest.json" : "thư mục"} này:
           </p>

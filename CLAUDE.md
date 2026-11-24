@@ -113,7 +113,7 @@ Cargo workspace members: `crates/dm-core` (engine, no Tauri dependency), `crates
 - Versions:
   - Every request carries `X-DM-Version`. The app stores it in `ConnectedExtension.version`; a missing header means an extension from before version reporting.
   - The UI flags browsers whose latest extension is older than `extension_setup::bundled_version` (`outdatedExtensions` in `api.ts`) with a sidebar card and update steps in the wizard. A version change emits `dm://extension-updated`.
-  - Self-update: `dmSelfUpdate()` compares the on-disk `manifest.json` (the app rewrites the folder on start) with the running version and calls `runtime.reload()` when the disk copy is newer. A `dmReloadedFor` guard prevents reload loops. It runs at boot, on page loads (at most every 5 min) and when the popup opens.
+  - Self-update: `dmSelfUpdate()` compares the on-disk `manifest.json` (the app rewrites the folder on start) with the running version and calls `runtime.reload()` when the disk copy is newer. A `dmReloadedFor` guard prevents reload loops. It runs at boot, on page loads (at most every 5 min), when the popup opens, and every 30 s through the `dm-self-update` alarm (so the user never has to reload by hand). The wizard's update panel therefore just waits for `dm://extension-updated`; the manual reload steps only appear after 60 s or on request.
   - This only works if the version is bumped: keep `extension/manifest.json` equal to the app version (a test in `extension_setup.rs` checks it).
 
 ### Frontend (`src/`)
