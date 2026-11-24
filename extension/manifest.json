@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DownloadManager Connector",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Chuyển các lượt tải từ trình duyệt sang DownloadManager để tải đa luồng, nhanh hơn.",
   "permissions": ["downloads", "cookies", "contextMenus", "storage", "webRequest", "alarms"],
   "host_permissions": ["<all_urls>"],

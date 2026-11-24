@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-24
+
 ### 🔧 Cải tiến
 - **Extension tự cập nhật, không cần bấm tải lại.** Khi app có bản extension mới, extension tự nạp bản mới trong khoảng 30 giây khi trình duyệt đang mở. Không phải vào trang tiện ích bấm nút ↻ nữa. Lần cập nhật đầu tiên lên bản này (từ extension 0.4.x hoặc 0.5.0) diễn ra khi bạn mở một trang web bất kỳ hoặc bấm biểu tượng extension.
 
@@ -136,7 +138,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1
 [0.5.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.0
 [0.4.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.4
 [0.4.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.3
