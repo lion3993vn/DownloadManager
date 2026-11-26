@@ -6,6 +6,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-26
+
 ### ✨ Tính năng mới
 - **Giao diện tiếng Anh.** App, menu khay hệ thống và extension có thêm tiếng Anh. App tự theo ngôn ngữ của hệ điều hành; đổi trong *Cài đặt → Giao diện → Ngôn ngữ*. Extension theo ngôn ngữ của trình duyệt.
 
@@ -149,7 +151,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.2
 [0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1
 [0.5.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.0
 [0.4.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.4.4
