@@ -42,6 +42,20 @@ pub async fn probe_url(
         .map_err(err)
 }
 
+/// The videos of a playlist / channel page, to add them one by one.
+#[tauri::command]
+pub async fn media_playlist(
+    state: State<'_, AppState>,
+    url: String,
+    headers: Option<RequestHeaders>,
+) -> CmdResult<dm_core::PlaylistInfo> {
+    let engine = state.engine.clone();
+    engine
+        .media_playlist(url.trim(), &headers.unwrap_or_default())
+        .await
+        .map_err(err)
+}
+
 #[tauri::command]
 pub fn pause_download(state: State<'_, AppState>, id: DownloadId) -> CmdResult<()> {
     state.engine.pause(id).map_err(err)
@@ -141,6 +155,7 @@ pub fn save_settings(
         app.sort_by_type = settings.app.sort_by_type;
         app.category_dirs = settings.app.category_dirs;
         app.extract_zip = settings.app.extract_zip;
+        app.schedule = settings.app.schedule;
         if app.language != settings.app.language {
             app.language = settings.app.language;
             i18n::set_preference(&app.language);

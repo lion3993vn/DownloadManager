@@ -8,6 +8,14 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+- **Tải theo lịch.** Chọn giờ bắt đầu (và giờ dừng nếu muốn) cùng các ngày trong tuần ở *Cài đặt → Tự động*. Đến giờ bắt đầu, các tệp đang tạm dừng (kể cả tệp "Thêm, tải sau") được tải tiếp; đến giờ dừng thì tạm dừng tất cả. Kết hợp với **Khi tải xong → Tắt máy** để tải qua đêm.
+- **Dán nhiều link một lần.** Dán danh sách link (mỗi dòng một link) hoặc mẫu đánh số như `file[01-20].zip`, `anh[a-e].jpg`: hộp thoại thêm link liệt kê tất cả kèm ô chọn, mỗi link là một lượt tải.
+- **Tải cả danh sách phát và kênh.** Dán link danh sách phát hoặc kênh YouTube (hoặc bấm **Tải cả danh sách phát** khi mở một video trong danh sách): chọn video, một chất lượng cho tất cả, và có thể lưu vào thư mục mang tên danh sách. Tối đa 1.000 video.
+
+### 🐛 Sửa lỗi
+- Link kênh và danh sách phát không còn bị quá thời gian khi app kiểm tra link.
+
 ## [0.5.3] - 2026-11-26
 
 ### ✨ Tính năng mới

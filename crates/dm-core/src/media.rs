@@ -17,8 +17,8 @@ use crate::naming;
 use crate::storage::{part_dir, remove_part};
 use crate::transfer::{self, Outcome, SpeedMeter};
 use crate::types::{
-    DownloadInfo, DownloadKind, MediaInfo, MediaQuality, ProbeResult, Progress, RequestHeaders,
-    SegmentInfo,
+    DownloadInfo, DownloadKind, MediaInfo, MediaQuality, PlaylistEntry, PlaylistInfo, ProbeResult,
+    Progress, RequestHeaders, SegmentInfo,
 };
 use serde_json::Value;
 use std::collections::{BTreeSet, VecDeque};
@@ -487,7 +487,13 @@ async fn dump_json(
     token: &CancellationToken,
 ) -> Result<Option<Value>> {
     let mut cmd = command(tools, headers);
-    cmd.arg("-J").args(format).arg("--").arg(url);
+    // `--flat-playlist`: a channel or playlist page answers at once with its
+    // entry list (-> "this link is a playlist") instead of extracting every
+    // video first, which outlasts INSPECT_TIMEOUT. Single videos are unchanged.
+    cmd.args(["-J", "--flat-playlist"])
+        .args(format)
+        .arg("--")
+        .arg(url);
     let Some(out) = run_to_end(cmd, token, INSPECT_TIMEOUT).await? else {
         return Ok(None);
     };
@@ -499,6 +505,91 @@ async fn dump_json(
         ));
     }
     Ok(Some(v))
+}
+
+/// Listing a long channel can take a while: yt-dlp pages through it.
+const PLAYLIST_TIMEOUT: Duration = Duration::from_secs(180);
+/// Entries listed at most (a channel can have thousands of videos).
+pub const PLAYLIST_MAX: usize = 1000;
+
+/// The videos of a playlist or channel page, without inspecting each one
+/// (`--flat-playlist`): each entry is then added as its own media download.
+pub(crate) async fn playlist(
+    tools: &MediaTools,
+    url: &str,
+    headers: &RequestHeaders,
+) -> Result<PlaylistInfo> {
+    // Like extract(): no browser cookies unless they are needed.
+    let plain = RequestHeaders {
+        referrer: headers.referrer.clone(),
+        user_agent: None,
+        cookies: None,
+    };
+    let mut cmd = command(tools, &plain);
+    // `--yes-playlist` overrides the `--no-playlist` of command().
+    cmd.args(["--yes-playlist", "--flat-playlist", "--playlist-end"])
+        .arg(PLAYLIST_MAX.to_string())
+        .args(["-J", "--"])
+        .arg(url);
+    let out = run_to_end(cmd, &CancellationToken::new(), PLAYLIST_TIMEOUT)
+        .await?
+        .expect("not cancelled");
+    let v: Value = serde_json::from_str(out.trim())
+        .map_err(|e| Error::Other(format!("yt-dlp returned unreadable data: {e}")))?;
+    let list = playlist_from(&v);
+    if list.entries.is_empty() {
+        return Err(Error::Other(
+            "yt-dlp: no videos found in this playlist".into(),
+        ));
+    }
+    Ok(list)
+}
+
+/// `yt-dlp -J --flat-playlist` output -> entries that are single videos.
+/// Nested playlists (a channel's "Videos" / "Shorts" tabs) are skipped.
+fn playlist_from(v: &Value) -> PlaylistInfo {
+    let entries = v
+        .get("entries")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter(|e| str_of(e, "_type") != Some("playlist"))
+                .filter_map(|e| {
+                    let id = str_of(e, "id");
+                    let url = str_of(e, "url")
+                        .filter(|u| u.starts_with("http"))
+                        .or_else(|| str_of(e, "webpage_url"))
+                        .map(str::to_string)
+                        .or_else(|| {
+                            // Older YouTube flat entries carry only the id.
+                            let ie = str_of(e, "ie_key").unwrap_or("");
+                            id.filter(|_| ie.eq_ignore_ascii_case("youtube"))
+                                .map(|id| format!("https://www.youtube.com/watch?v={id}"))
+                        })?;
+                    let thumbnail = e
+                        .get("thumbnails")
+                        .and_then(Value::as_array)
+                        .and_then(|t| t.iter().rev().find_map(|x| str_of(x, "url")))
+                        .or_else(|| str_of(e, "thumbnail"))
+                        .map(str::to_string);
+                    Some(PlaylistEntry {
+                        title: str_of(e, "title").or(id).unwrap_or(&url).to_string(),
+                        url,
+                        duration_secs: e.get("duration").and_then(Value::as_f64),
+                        thumbnail,
+                    })
+                })
+                .take(PLAYLIST_MAX)
+                .collect()
+        })
+        .unwrap_or_default();
+    PlaylistInfo {
+        title: str_of(v, "title").unwrap_or("playlist").to_string(),
+        uploader: str_of(v, "uploader")
+            .or_else(|| str_of(v, "channel"))
+            .map(str::to_string),
+        entries,
+    }
 }
 
 /// Describe a video page (title, qualities…) without downloading it.
@@ -1236,5 +1327,40 @@ mod tests {
         );
         let e = error_from("ERROR: Unsupported URL: https://a.com\n");
         assert_eq!(e.to_string(), "yt-dlp: Unsupported URL: https://a.com");
+    }
+
+    #[test]
+    fn playlist_entries() {
+        let v: Value = serde_json::from_value(serde_json::json!({
+            "_type": "playlist",
+            "title": "Mix",
+            "channel": "Someone",
+            "entries": [
+                { "_type": "url", "ie_key": "Youtube", "id": "aaa", "url": "https://www.youtube.com/watch?v=aaa",
+                  "title": "First", "duration": 61.0,
+                  "thumbnails": [{ "url": "https://i/small.jpg" }, { "url": "https://i/big.jpg" }] },
+                { "_type": "url", "ie_key": "Youtube", "id": "bbb", "title": "Old style" },
+                { "_type": "playlist", "title": "Shorts", "url": "https://www.youtube.com/@x/shorts" },
+                { "_type": "url", "ie_key": "Vimeo", "id": "123" },
+                { "_type": "url", "ie_key": "TikTok", "webpage_url": "https://www.tiktok.com/@a/video/1" }
+            ]
+        }))
+        .unwrap();
+        let p = playlist_from(&v);
+        assert_eq!(p.title, "Mix");
+        assert_eq!(p.uploader.as_deref(), Some("Someone"));
+        let urls: Vec<&str> = p.entries.iter().map(|e| e.url.as_str()).collect();
+        assert_eq!(
+            urls,
+            [
+                "https://www.youtube.com/watch?v=aaa",
+                "https://www.youtube.com/watch?v=bbb",
+                "https://www.tiktok.com/@a/video/1",
+            ]
+        );
+        assert_eq!(p.entries[0].thumbnail.as_deref(), Some("https://i/big.jpg"));
+        assert_eq!(p.entries[0].duration_secs, Some(61.0));
+        assert_eq!(p.entries[1].title, "Old style");
+        assert_eq!(p.entries[2].title, "https://www.tiktok.com/@a/video/1");
     }
 }

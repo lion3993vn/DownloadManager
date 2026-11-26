@@ -148,6 +148,39 @@ export interface AppSettings {
   categoryDirs: Record<string, string>;
   /** Unpack finished .zip files into a folder next to them. */
   extractZip: boolean;
+  /** Start / stop downloading at set times (scheduler.rs). */
+  schedule: Schedule;
+}
+
+export interface Schedule {
+  enabled: boolean;
+  /** "HH:MM", local time: resume every paused download. */
+  start: string;
+  stopEnabled: boolean;
+  /** "HH:MM", local time: pause everything. */
+  stop: string;
+  /** 0 = Monday … 6 = Sunday. */
+  days: number[];
+}
+
+/** A playlist or channel page, listed without inspecting each video. */
+export interface PlaylistInfo {
+  title: string;
+  uploader: string | null;
+  entries: PlaylistEntry[];
+}
+
+export interface PlaylistEntry {
+  url: string;
+  title: string;
+  durationSecs: number | null;
+  thumbnail: string | null;
+}
+
+/** The schedule started or stopped downloads. */
+export interface ScheduleFired {
+  action: "start" | "stop";
+  count: number;
 }
 
 /** What to do once every download is done (not saved across restarts). */
@@ -244,6 +277,8 @@ export const api = {
   list: () => invoke<DownloadInfo[]>("list_downloads"),
   add: (request: NewDownload) => invoke<DownloadInfo>("add_download", { request }),
   probe: (url: string, headers?: RequestHeaders) => invoke<ProbeResult>("probe_url", { url, headers }),
+  /** The videos of a playlist or channel page (needs yt-dlp). */
+  mediaPlaylist: (url: string, headers?: RequestHeaders) => invoke<PlaylistInfo>("media_playlist", { url, headers }),
   pause: (id: number) => invoke<void>("pause_download", { id }),
   resume: (id: number) => invoke<void>("resume_download", { id }),
   cancel: (id: number) => invoke<void>("cancel_download", { id }),
@@ -351,3 +386,7 @@ export const onWhenDoneFailed = (cb: (error: string) => void): Promise<UnlistenF
 /** A finished .zip was unpacked (or failed to). */
 export const onExtracted = (cb: (x: Extracted) => void): Promise<UnlistenFn> =>
   listen<Extracted>("dm://extracted", (e) => cb(e.payload));
+
+/** The download schedule resumed or paused downloads. */
+export const onSchedule = (cb: (f: ScheduleFired) => void): Promise<UnlistenFn> =>
+  listen<ScheduleFired>("dm://schedule", (e) => cb(e.payload));

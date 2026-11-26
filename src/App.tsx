@@ -4,6 +4,7 @@ import {
   onCapture,
   onExtensionConnected,
   onExtracted,
+  onSchedule,
   onExtensionUpdated,
   onPairRequest,
   outdatedExtensions,
@@ -170,6 +171,16 @@ export default function App() {
         setExtensions((old) => [...old.filter((x) => x.origin !== e.origin), e]);
         if (!outdatedExtensions([e], bundledExtRef.current).length) {
           push({ kind: "success", title: tr("app.extUpdated", { browser: e.browser }), body: tr("app.extUpdatedBody", { version: e.version ?? "" }) });
+        }
+      }),
+      // The download schedule fired (Settings → Automation).
+      onSchedule(({ action, count }) => {
+        if (action === "stop") {
+          if (count) push({ kind: "info", title: tr("finish.scheduleStopped"), body: tr("app.fileCount", { n: count }) });
+        } else if (count) {
+          push({ kind: "success", title: tr("finish.scheduleStarted"), body: tr("app.fileCount", { n: count }) });
+        } else {
+          push({ kind: "info", title: tr("finish.scheduleStarted"), body: tr("finish.scheduleNothing") });
         }
       }),
       // A finished .zip was unpacked (setting "Unpack .zip files").

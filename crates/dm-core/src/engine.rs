@@ -171,6 +171,17 @@ impl Engine {
     }
 
     /// Inspect a URL (size, name, range support) without downloading it.
+    /// List the videos of a playlist or channel page (needs the media tools).
+    pub async fn media_playlist(
+        &self,
+        url: &str,
+        headers: &RequestHeaders,
+    ) -> Result<crate::types::PlaylistInfo> {
+        http::validate_url(url)?;
+        let tools = self.inner.media_tools().ok_or(Error::MediaToolsMissing)?;
+        crate::media::playlist(&tools, url, headers).await
+    }
+
     pub async fn probe(&self, url: &str, headers: &RequestHeaders) -> Result<ProbeResult> {
         if crate::media::is_media_site(url) {
             let tools = self.inner.media_tools().ok_or(Error::MediaToolsMissing)?;

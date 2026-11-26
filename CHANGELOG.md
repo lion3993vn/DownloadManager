@@ -8,6 +8,14 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 
 ## [Unreleased]
 
+### ✨ New features
+- **Download on a schedule.** Pick a start time (and optionally a stop time) and the days of the week in *Settings → Automation*. At the start time, paused downloads (including "Add, start later" ones) resume; at the stop time everything pauses. Combine it with **When done → Shut down** for night-time downloads.
+- **Paste many links at once.** Paste a list of links (one per line) or a numbered pattern like `file[01-20].zip` or `photo[a-e].jpg`: the add dialog lists them all with checkboxes and adds one download each.
+- **Download whole playlists and channels.** Paste a YouTube playlist or channel link (or click **Download the whole playlist** on a video opened from a playlist): pick the videos, one quality for all, and optionally a folder named after the playlist. Up to 1,000 videos.
+
+### 🐛 Bug fixes
+- Channel and playlist links no longer time out while the app inspects them.
+
 ## [0.5.3] - 2026-11-26
 
 ### ✨ New features

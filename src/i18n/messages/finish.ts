@@ -20,6 +20,9 @@ export default defineMessages({
     "finish.extracted": "Đã giải nén",
     "finish.extractFailed": "Không giải nén được {name}",
     "finish.openFolder": "Mở thư mục",
+    "finish.scheduleStarted": "Đã bắt đầu tải theo lịch",
+    "finish.scheduleStopped": "Đã tạm dừng theo lịch",
+    "finish.scheduleNothing": "Đến giờ tải theo lịch nhưng không có tệp nào đang tạm dừng.",
   },
   en: {
     "finish.button": "When done",
@@ -39,5 +42,8 @@ export default defineMessages({
     "finish.extracted": "Unpacked",
     "finish.extractFailed": "Could not unpack {name}",
     "finish.openFolder": "Open folder",
+    "finish.scheduleStarted": "Scheduled downloads started",
+    "finish.scheduleStopped": "Paused on schedule",
+    "finish.scheduleNothing": "The schedule started, but no download was paused.",
   },
 });

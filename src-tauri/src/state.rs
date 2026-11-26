@@ -34,6 +34,8 @@ pub struct AppSettings {
     pub category_dirs: BTreeMap<String, String>,
     /// Unpack finished `.zip` files into a folder next to them (finish.rs).
     pub extract_zip: bool,
+    /// Start / stop times for downloading (scheduler.rs).
+    pub schedule: crate::scheduler::Schedule,
 }
 
 impl Default for AppSettings {
@@ -49,6 +51,7 @@ impl Default for AppSettings {
             sort_by_type: false,
             category_dirs: crate::categories::default_dirs(),
             extract_zip: false,
+            schedule: Default::default(),
         }
     }
 }

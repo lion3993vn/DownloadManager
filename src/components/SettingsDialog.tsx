@@ -118,6 +118,8 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
 
   if (!s) return null;
   const eng = s.engine;
+  const sch = s.app.schedule;
+  const setSchedule = (patch: Partial<Settings["app"]["schedule"]>) => setS({ ...s, app: { ...s.app, schedule: { ...sch, ...patch } } });
   const setEngine = (patch: Partial<Settings["engine"]>) => setS({ ...s, engine: { ...eng, ...patch } });
   const setApp = (patch: Partial<Settings["app"]>) => setS({ ...s, app: { ...s.app, ...patch } });
 
@@ -253,6 +255,51 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                     ))}
                   </div>
                   <p className="mt-2 text-[12px] text-mute">{t("settings.categoryDirsHint", { dir: eng.downloadDir })}</p>
+                </div>
+              )}
+
+              <SectionTitle>{t("settings.scheduleHeading")}</SectionTitle>
+              <Row title={t("settings.schedule")} hint={t("settings.scheduleHint")}>
+                <Switch checked={sch.enabled} onChange={(v) => setSchedule({ enabled: v })} />
+              </Row>
+              {sch.enabled && (
+                <div className="mt-1 mb-2 space-y-3 rounded-xl border border-line bg-panel/50 p-3">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-2">
+                    <label className="flex items-center gap-2">
+                      {t("settings.scheduleStart")}
+                      <input type="time" className="field w-[110px] py-1.5 tabular-nums" value={sch.start} onChange={(e) => setSchedule({ start: e.target.value })} />
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" className="h-4 w-4 accent-[var(--color-brand)]" checked={sch.stopEnabled} onChange={(e) => setSchedule({ stopEnabled: e.target.checked })} />
+                      {t("settings.scheduleStop")}
+                      <input
+                        type="time"
+                        className="field w-[110px] py-1.5 tabular-nums disabled:opacity-50"
+                        value={sch.stop}
+                        disabled={!sch.stopEnabled}
+                        onChange={(e) => setSchedule({ stop: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("settings.scheduleDays")}>
+                    {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+                      const on = sch.days.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setSchedule({ days: on ? sch.days.filter((x) => x !== d) : [...sch.days, d].sort() })}
+                          className={`h-8 min-w-[44px] rounded-lg border px-2 text-[12.5px] font-medium transition ${
+                            on ? "border-brand bg-brand/10 text-brand" : "border-line bg-card text-mute hover:text-ink"
+                          }`}
+                        >
+                          {t(`settings.day${d}` as MessageKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {sch.days.length === 0 && <p className="text-[12px] text-amber-600">{t("settings.scheduleNoDays")}</p>}
                 </div>
               )}
 

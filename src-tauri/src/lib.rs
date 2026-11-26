@@ -7,6 +7,7 @@ mod extension_setup;
 mod finish;
 mod i18n;
 mod media_tools;
+mod scheduler;
 mod state;
 mod tray;
 mod updater;
@@ -46,6 +47,7 @@ pub fn run() {
             updater::spawn_periodic_check(app.handle().clone());
             media_tools::start(app.handle());
             clipboard::start(app.handle());
+            scheduler::start(app.handle());
             // The window is created hidden (`visible: false`); a launch at
             // login stays in the tray.
             if !autostart::launched_at_login() {
@@ -66,6 +68,7 @@ pub fn run() {
             commands::list_downloads,
             commands::add_download,
             commands::probe_url,
+            commands::media_playlist,
             commands::pause_download,
             commands::resume_download,
             commands::cancel_download,

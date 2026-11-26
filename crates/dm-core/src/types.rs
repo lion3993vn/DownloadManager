@@ -277,6 +277,25 @@ pub struct MediaInfo {
     pub needs_ffmpeg_for_best: bool,
 }
 
+/// A playlist or channel page, listed without inspecting each video.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistInfo {
+    pub title: String,
+    pub uploader: Option<String>,
+    pub entries: Vec<PlaylistEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistEntry {
+    /// Page of the single video; add it as a [`DownloadKind::Media`] download.
+    pub url: String,
+    pub title: String,
+    pub duration_secs: Option<f64>,
+    pub thumbnail: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaQuality {

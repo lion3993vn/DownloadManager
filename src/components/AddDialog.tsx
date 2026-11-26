@@ -1,12 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, isMediaToolsMissing, type Capture, type ProbeResult, type RequestHeaders } from "../lib/api";
+import { api, isMediaToolsMissing, type Capture, type PlaylistInfo, type ProbeResult, type RequestHeaders } from "../lib/api";
 import { errorText, formatBytes, formatDuration, hostOf, isProbablyUrl, resolutionLabel } from "../lib/format";
+import { expandLinks, joinPath, nameFromUrl, safeFolderName } from "../lib/batch";
 import { Field, Modal } from "./Modal";
 import { FileTile } from "./FileTile";
-import { AlertIcon, BoltIcon, ClipboardIcon, FolderIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
+import { PickList } from "./PickList";
+import { AlertIcon, BoltIcon, ClipboardIcon, FolderIcon, LayersIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
 import { ToolsInstallCard } from "./MediaTools";
-import { useT, type TFunction } from "../i18n";
+import { useT, type MessageKey, type TFunction } from "../i18n";
+
+/** Qualities offered for a whole playlist (videos are not inspected one by one). */
+const PLAYLIST_QUALITIES: { id: string; label: MessageKey | null; text?: string }[] = [
+  { id: "best", label: "add.qualityBest" },
+  { id: "1080", label: null, text: "1080p" },
+  { id: "720", label: null, text: "720p" },
+  { id: "480", label: null, text: "480p" },
+  { id: "audio", label: null, text: "MP3" },
+];
+
+type PlaylistState =
+  | { kind: "loading"; url: string }
+  | { kind: "ok"; url: string; info: PlaylistInfo }
+  | { kind: "error"; url: string; message: string };
+
+/** `…watch?v=x&list=PL…` on YouTube: the playlist the video belongs to. */
+function youtubeList(url: string): string | null {
+  const m = /^https?:\/\/(?:www\.|m\.|music\.)?youtube\.com\/watch\?[^#]*?\blist=([\w-]+)/i.exec(url.trim());
+  return m ? `https://www.youtube.com/playlist?list=${m[1]}` : null;
+}
 
 interface Props {
   /** Prefilled from a browser capture. */
@@ -57,16 +79,27 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   const [quality, setQuality] = useState<string | null>(null);
   const [probeNonce, setProbeNonce] = useState(0);
   const [busy, setBusy] = useState(false);
-  const urlRef = useRef<HTMLInputElement>(null);
+  const urlRef = useRef<HTMLTextAreaElement>(null);
+  // Several links (a pasted list or a [01-20] pattern), or a playlist: a checklist.
+  const links = useMemo(() => expandLinks(url), [url]);
+  const batch = links.length > 1;
+  const [playlist, setPlaylist] = useState<PlaylistState | null>(null);
+  const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
+  const [plQuality, setPlQuality] = useState("1080");
+  const [plFolder, setPlFolder] = useState(true);
 
   const headers: RequestHeaders | undefined = capture
     ? { referrer: capture.referrer, userAgent: capture.userAgent, cookies: capture.cookies }
     : undefined;
 
+  // A new list starts fully checked.
+  useEffect(() => setUnchecked(new Set()), [url, playlist?.kind]);
+
   // Inspect the URL (debounced): name, size, range support.
   useEffect(() => {
     const target = url.trim();
-    if (!isProbablyUrl(target)) {
+    setPlaylist(null);
+    if (!isProbablyUrl(target) || expandLinks(target).length > 1) {
       setProbe({ kind: "idle" });
       return;
     }
@@ -84,7 +117,13 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           }
           if (!nameTouched) setFileName(result.fileName);
         })
-        .catch((e) => !stale && setProbe({ kind: "error", message: String(e) }));
+        .catch((e) => {
+          if (stale) return;
+          const message = String(e);
+          setProbe({ kind: "error", message });
+          // A playlist or channel page: list its videos instead.
+          if (/this link is a playlist/i.test(message)) loadPlaylist(target);
+        });
     }, 350);
     return () => {
       stale = true;
@@ -96,6 +135,14 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   useEffect(() => {
     if (!capture) urlRef.current?.focus();
   }, [capture]);
+
+  function loadPlaylist(target: string) {
+    setPlaylist({ kind: "loading", url: target });
+    api
+      .mediaPlaylist(target, headers)
+      .then((info) => setPlaylist((p) => (p?.url === target ? { kind: "ok", url: target, info } : p)))
+      .catch((e) => setPlaylist((p) => (p?.url === target ? { kind: "error", url: target, message: String(e) } : p)));
+  }
 
   async function pickFolder() {
     const dir = await open({ directory: true, defaultPath: saveDir || undefined });
@@ -127,6 +174,47 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
     }
   }
 
+  /** Add every checked link (batch) or playlist video, one download each. */
+  async function submitMany(startPaused: boolean) {
+    const plInfo = playlist?.kind === "ok" ? playlist.info : null;
+    const urls = (plInfo ? plInfo.entries.map((e) => e.url) : links).filter((u) => !unchecked.has(u));
+    if (!urls.length) return;
+    setBusy(true);
+    let added = 0;
+    let firstError: string | null = null;
+    try {
+      // Playlist: one folder for all (by type, then the playlist's own folder).
+      let plDir: string | null = null;
+      if (plInfo) {
+        plDir = dirTouched ? saveDir : await api.categoryDir("", "media", plQuality).catch(() => saveDir);
+        const sub = safeFolderName(plInfo.title);
+        if (plFolder && sub) plDir = joinPath(plDir, sub);
+      }
+      for (const u of urls) {
+        const dir = plDir ?? (dirTouched ? saveDir : await api.categoryDir(nameFromUrl(u), null, null).catch(() => saveDir));
+        try {
+          await api.add({
+            url: u,
+            saveDir: dir.trim() || null,
+            connections,
+            headers,
+            startPaused,
+            kind: plInfo ? "media" : null,
+            mediaQuality: plInfo ? plQuality : null,
+          });
+          added++;
+        } catch (e) {
+          firstError ??= `${u}: ${String(e)}`;
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+    if (added) onAdded(t("add.addedMany", { n: added }), !startPaused);
+    if (firstError) onError(added ? t("add.someFailed", { n: urls.length - added, error: firstError }) : firstError);
+    if (added) onClose();
+  }
+
   const valid = isProbablyUrl(url);
   const stream = probe.kind === "ok" ? probe.result.stream : null;
   const media = probe.kind === "ok" ? probe.result.media : null;
@@ -135,8 +223,9 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   const size = media ? (picked?.estimatedSize ?? null) : probe.kind === "ok" ? probe.result.totalSize : (capture?.fileSize ?? null);
   const blocked = Boolean(stream?.live || media?.isLive || toolsMissing);
   const videoSite = VIDEO_SITE.test(url);
-  const downloadKind = media ? "media" : stream ? "hls" : (capture?.kind ?? null);
-  const mediaQuality = media ? quality : null;
+  const plInfo = playlist?.kind === "ok" ? playlist.info : null;
+  const downloadKind = plInfo || media ? "media" : stream ? "hls" : (capture?.kind ?? null);
+  const mediaQuality = plInfo ? plQuality : media ? quality : null;
 
   // "Sort by type": the folder follows the file type (the app knows the
   // folders; without sorting this is the download folder).
@@ -160,6 +249,13 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   }
   const shownName = fileName || (valid ? "…" : "");
   const fromClipboard = capture?.source === "clipboard";
+  // Checklist modes: several links, or the videos of a playlist.
+  const listMode = batch || playlist != null;
+  const listUrls = plInfo ? plInfo.entries.map((e) => e.url) : batch ? links : [];
+  const pickedCount = listUrls.filter((u) => !unchecked.has(u)).length;
+  const canAdd = !busy && (listMode ? pickedCount > 0 : valid && !blocked);
+  const go = (startPaused: boolean) => (listMode ? submitMany(startPaused) : submit(startPaused));
+  const wholeList = listMode ? null : youtubeList(url);
 
   return (
     <Modal
@@ -187,11 +283,11 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           <button className="btn-ghost" onClick={onClose}>
             {t("common.cancel")}
           </button>
-          <button className="btn-outline" disabled={!valid || busy || blocked} onClick={() => submit(true)}>
+          <button className="btn-outline" disabled={!canAdd} onClick={() => go(true)}>
             <PlusIcon /> {t("add.addLater")}
           </button>
-          <button className="btn-primary min-w-[110px]" disabled={!valid || busy || blocked} onClick={() => submit(false)}>
-            <BoltIcon /> {t("add.downloadNow")}
+          <button className="btn-primary min-w-[110px]" disabled={!canAdd} onClick={() => go(false)}>
+            <BoltIcon /> {listMode ? t("add.downloadN", { n: pickedCount }) : t("add.downloadNow")}
           </button>
         </>
       }
@@ -200,23 +296,105 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid && !busy && !blocked) submit(false);
+          if (canAdd) go(false);
         }}
       >
         <div className="relative">
-          <LinkIcon className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
-          <input
+          <LinkIcon className="pointer-events-none absolute top-[13px] left-3.5 text-faint" />
+          <textarea
             ref={urlRef}
-            className="field py-2.5 pl-10 font-mono text-[12px]"
+            rows={Math.min(6, Math.max(1, url.split("\n").length))}
+            className="field block resize-none py-2.5 pl-10 font-mono text-[12px] leading-[18px]"
             placeholder="https://example.com/file.zip"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter adds; Shift+Enter starts another line for more links.
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             spellCheck={false}
           />
+          {!url.trim() && <p className="mt-1.5 text-[11.5px] text-mute">{t("add.batchTip")}</p>}
         </div>
 
+        {/* Several links: one download each */}
+        {batch && (
+          <PickList
+            items={links.map((u) => ({ key: u, title: nameFromUrl(u), sub: hostOf(u) }))}
+            unchecked={unchecked}
+            onChange={setUnchecked}
+          />
+        )}
+
+        {/* Playlist / channel */}
+        {playlist?.kind === "loading" && (
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-panel/60 p-3.5 text-[12.5px] text-mute">
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" /> {t("add.loadingPlaylist")}
+          </div>
+        )}
+        {playlist?.kind === "error" && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3.5 text-[12.5px] text-red-600">
+            <AlertIcon /> {errorText(playlist.message)}
+          </div>
+        )}
+        {plInfo && (
+          <>
+            <div className="flex items-center gap-3 rounded-xl border border-line bg-panel/60 p-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/12 text-rose-600 dark:text-rose-400">
+                <LayersIcon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-medium text-ink">{plInfo.title}</div>
+                <div className="truncate text-[12px] text-mute">
+                  {[plInfo.uploader, t("add.playlistCount", { n: plInfo.entries.length })].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              {/* Opened from one video of the list: go back to just that one. */}
+              {youtubeList(url) && (
+                <button type="button" className="btn-ghost shrink-0 text-[12px]" onClick={() => setPlaylist(null)}>
+                  {t("add.singleVideo")}
+                </button>
+              )}
+            </div>
+            <label className="flex items-center gap-2.5 text-[12.5px] text-ink-2">
+              <input type="checkbox" className="h-4 w-4 accent-[var(--color-brand)]" checked={plFolder} onChange={(e) => setPlFolder(e.target.checked)} />
+              {t("add.playlistFolder", { name: safeFolderName(plInfo.title) || "…" })}
+            </label>
+            <Field label={t("add.quality")} hint={t("add.playlistQualityHint")}>
+              <div className="flex gap-1 rounded-lg bg-panel p-1">
+                {PLAYLIST_QUALITIES.map((q) => (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setPlQuality(q.id)}
+                    aria-pressed={plQuality === q.id}
+                    className={`flex-1 rounded-md py-1.5 text-[12.5px] font-medium transition ${
+                      plQuality === q.id ? "bg-card text-brand shadow-card" : "text-mute hover:text-ink"
+                    }`}
+                  >
+                    {q.label ? t(q.label) : q.text}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <PickList
+              items={plInfo.entries.map((e) => ({
+                key: e.url,
+                title: e.title,
+                sub: e.durationSecs ? formatDuration(e.durationSecs) : hostOf(e.url),
+                thumb: e.thumbnail,
+              }))}
+              unchecked={unchecked}
+              onChange={setUnchecked}
+            />
+          </>
+        )}
+
         {/* File preview card */}
-        {valid && (
+        {valid && !listMode && (
           <div className="animate-fade-in flex items-center gap-3.5 rounded-xl border border-line bg-panel/60 p-3.5">
             {media?.thumbnail ? (
               <img src={media.thumbnail} alt="" className="h-[54px] w-24 shrink-0 rounded-lg bg-track object-cover" referrerPolicy="no-referrer" />
@@ -302,9 +480,16 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           </div>
         )}
 
-        {toolsMissing && <ToolsInstallCard onInstalled={() => setProbeNonce((n) => n + 1)} onError={onError} />}
+        {/* A video opened from a playlist: offer the whole list. */}
+        {wholeList && (
+          <button type="button" className="btn-outline w-full justify-center" onClick={() => loadPlaylist(wholeList)}>
+            <LayersIcon /> {t("add.wholePlaylist")}
+          </button>
+        )}
 
-        {media && !media.isLive && media.qualities.length > 0 && (
+        {toolsMissing && !listMode && <ToolsInstallCard onInstalled={() => setProbeNonce((n) => n + 1)} onError={onError} />}
+
+        {media && !listMode && !media.isLive && media.qualities.length > 0 && (
           <Field label={t("add.quality")} hint={media.needsFfmpegForBest ? t("add.qualityHint") : undefined}>
             <div className="flex flex-wrap gap-1.5">
               {media.qualities.map((q) => (
@@ -346,7 +531,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           </div>
         </Field>
 
-        {!media && !toolsMissing && (
+        {!media && !toolsMissing && !playlist && (
           <Field
             label={t("add.connections")}
             hint={t("add.connectionsHint")}
