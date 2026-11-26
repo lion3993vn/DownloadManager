@@ -19,7 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # Save on main only: a cache saved by a tag build can't be read by
+      # any later tag, it would only take space.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test -p dm-core -p dm-cli
 
   # Pushes and PRs: fast compile/lint check of the whole app instead of
@@ -128,10 +132,13 @@ jobs:
           releaseName: DownloadManager ${{ github.ref_name }}
           releaseDraft: true
           releaseBody: ${{ steps.notes.outputs.body }}
+      # Only the publish job needs these (installers also go to the release),
+      # and manual runs are checked right away: keep them a week, not 90 days.
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-${{ matrix.name }}
           path: target/**/release/bundle/**
+          retention-days: 7
 
   extension:
     runs-on: ubuntu-latest
@@ -145,6 +152,7 @@ jobs:
         with:
           name: browser-extension
           path: dist-extension/*.zip
+          retention-days: 7
 
   # After every platform is built: attach the extension, write the full
   # release description (changelog + download table + SHA-256) and publish.

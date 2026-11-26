@@ -67,3 +67,38 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Same cargo invocation as a release (features, profile, target), no installers.
       - run: pnpm tauri build --no-bundle ${{ matrix.args }}
+
+  # The repo has 10 GB of cache. Every release changes Cargo.lock (version
+  # bump), so each one adds a new ~4 GB set of caches next to the old ones,
+  # and GitHub then evicts by age, possibly the fresh ones above. Keep only
+  # the newest cache of each kind on main, and drop caches saved by tag
+  # builds (no later tag can read them).
+  prune:
+    needs: warm
+    # Also after a failed platform: its old cache stays, being its newest.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete outdated caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$REPO/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | [.id, .ref, .key, .created_at] | @tsv' > caches.tsv
+          tab="$(printf '\t')"
+          {
+            # Saved by tag builds.
+            awk -F'\t' '$2 ~ /refs\/tags\// { print $1 }' caches.tsv
+            # On main, all but the newest per key without its last part
+            # (rust-cache and setup-node end their keys with a lockfile hash).
+            awk -F'\t' '$2 == "refs/heads/main" { p = $3; sub(/-[^-]*$/, "", p); print p "\t" $4 "\t" $1 }' caches.tsv \
+              | sort -t "$tab" -k1,1 -k2,2r \
+              | awk -F'\t' 'seen[$1]++ { print $3 }'
+          } > delete.txt
+          echo "Deleting $(wc -l < delete.txt) of $(wc -l < caches.tsv) caches"
+          while read -r id; do
+            gh api -X DELETE "repos/$REPO/actions/caches/$id" > /dev/null && echo "deleted $id"
+          done < delete.txt
