@@ -116,9 +116,6 @@
   "optionsIntro": {
     "message": "Chuyển lượt tải từ trình duyệt sang app để tải đa luồng."
   },
-  "connectionHeading": {
-    "message": "Kết nối"
-  },
   "pairAuto": {
     "message": "Ghép cặp tự động"
   },
@@ -149,23 +146,14 @@
   "enabledDesc": {
     "message": "Khi tắt, mọi lượt tải đều do trình duyệt xử lý."
   },
-  "extLabel": {
-    "message": "Đuôi tệp cần bắt"
-  },
   "extPlaceholder": {
     "message": "Thêm đuôi, vd: torrent"
-  },
-  "extHelp": {
-    "message": "Nhấn <kbd>Enter</kbd> hoặc dấu cách để thêm, <kbd>Backspace</kbd> để xóa."
   },
   "removeExt": {
     "message": "Bỏ .$1"
   },
   "minSizeLabel": {
     "message": "Cũng bắt mọi tệp lớn hơn"
-  },
-  "minSizeHelp": {
-    "message": "Đặt 0 để tắt."
   },
   "videoButtonTitle": {
     "message": "Hiện nút “Tải video” trên trang"
@@ -179,14 +167,8 @@
   "reset": {
     "message": "Khôi phục mặc định"
   },
-  "dirty": {
-    "message": "Có thay đổi chưa lưu"
-  },
   "saved": {
     "message": "Đã lưu"
-  },
-  "saveChanges": {
-    "message": "Lưu thay đổi"
   },
   "optNotRunning": {
     "message": "Không thấy app đang chạy"
@@ -244,5 +226,74 @@
   },
   "openApp": {
     "message": "Hãy mở DownloadManager"
+  },
+  "recheck": {
+    "message": "Kiểm tra lại"
+  },
+  "fileTypesHeading": {
+    "message": "Loại tệp"
+  },
+  "fileTypesHint": {
+    "message": "Lượt tải có đuôi đang bật sẽ được chuyển sang app. Bấm vào đuôi để bật hoặc tắt."
+  },
+  "type_archive": {
+    "message": "Tệp nén & ảnh đĩa"
+  },
+  "type_program": {
+    "message": "Chương trình"
+  },
+  "type_video": {
+    "message": "Video"
+  },
+  "type_audio": {
+    "message": "Âm thanh"
+  },
+  "type_document": {
+    "message": "Tài liệu"
+  },
+  "type_other": {
+    "message": "Đuôi khác"
+  },
+  "typeCount": {
+    "message": "$1/$2"
+  },
+  "typeToggleAll": {
+    "message": "Bật hoặc tắt cả nhóm $1"
+  },
+  "minSizeDesc": {
+    "message": "Kể cả tệp có đuôi không nằm trong danh sách trên."
+  },
+  "sizeOff": {
+    "message": "Tắt"
+  },
+  "videoHeading": {
+    "message": "Video"
+  },
+  "advancedHeading": {
+    "message": "Nâng cao"
+  },
+  "advancedTitle": {
+    "message": "Kết nối thủ công"
+  },
+  "advancedDesc": {
+    "message": "Mã ghép cặp, cổng, khôi phục mặc định"
+  },
+  "autoSaveNote": {
+    "message": "Thay đổi được lưu tự động."
+  },
+  "chipConnected": {
+    "message": "Đã kết nối"
+  },
+  "chipOffline": {
+    "message": "App chưa chạy"
+  },
+  "chipNotPaired": {
+    "message": "Chưa ghép cặp"
+  },
+  "chipError": {
+    "message": "Lỗi"
+  },
+  "chipChecking": {
+    "message": "Đang kiểm tra"
   }
 }

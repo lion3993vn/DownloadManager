@@ -19,6 +19,9 @@
   const MIN_W = 200;
   const MIN_H = 120;
   const HIDE_DELAY = 1200;
+  // How often to look again while the pointer rests: feeds start a hover
+  // preview a moment after the pointer stops, with no further mousemove.
+  const IDLE_CHECK_MS = 500;
   const videos = document.getElementsByTagName("video");
 
   let enabled = true;
@@ -42,33 +45,53 @@
     host = document.createElement("dm-video-button");
     host.style.cssText = "all: initial; position: fixed; z-index: 2147483647; top: 0; left: 0; display: none;";
     const root = host.attachShadow({ mode: "closed" });
+    // A small frosted-glass pill: an icon only, until hovered, then it widens
+    // to show the label. Subdued so it does not cover the video.
     root.innerHTML = `
       <style>
         button {
-          all: initial;
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 7px 12px 7px 9px; border-radius: 10px; cursor: pointer;
-          font: 600 13px/1.2 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-          color: #fff; background: linear-gradient(to bottom, #3b74f0, #2563eb);
-          box-shadow: 0 4px 14px -2px rgb(15 23 42 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.12);
-          opacity: 0; transform: translateY(-4px);
-          transition: opacity .15s, transform .15s, background .15s;
+          all: initial; box-sizing: border-box;
+          display: inline-flex; align-items: center;
+          height: 32px; min-width: 32px; padding: 0 7px; border-radius: 999px; cursor: pointer;
+          font: 600 12px/1 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "SF Pro Text", sans-serif;
+          color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35);
+          background-color: rgb(20 24 33 / .26);
+          background-image: linear-gradient(180deg, rgb(255 255 255 / .26), rgb(255 255 255 / .06) 55%, rgb(255 255 255 / .1));
+          -webkit-backdrop-filter: blur(14px) saturate(170%); backdrop-filter: blur(14px) saturate(170%);
+          border: 1px solid rgb(255 255 255 / .3);
+          box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), inset 0 -1px 0 rgb(0 0 0 / .1),
+                      0 6px 20px -8px rgb(0 0 0 / .5);
+          opacity: 0; transform: translateY(-4px) scale(.94);
+          transition: opacity .18s ease, transform .18s ease, background-color .18s ease;
           user-select: none; white-space: nowrap;
         }
-        button.show { opacity: 1; transform: none; }
-        button:hover { background: linear-gradient(to bottom, #3b74f0, #1d4ed8); }
-        button:active { transform: scale(0.97); }
-        button.ok { background: #16a34a; }
-        button.err { background: #dc2626; }
+        button.show { opacity: .72; transform: none; }
+        button:hover, button.busy, button.ok, button.err { opacity: 1; }
+        button:hover { background-color: rgb(20 24 33 / .38); }
+        button:active { transform: scale(.95); }
+        button.ok { background-color: rgb(22 163 74 / .6); }
+        button.err { background-color: rgb(220 38 38 / .6); }
         button.busy { cursor: progress; }
-        svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
-              stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-        .text { display: flex; flex-direction: column; }
-        .sub { font-weight: 500; font-size: 11px; opacity: .85; }
+        svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
+              stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round;
+              filter: drop-shadow(0 1px 1px rgb(0 0 0 / .3)); }
+        .busy svg { animation: dm-bob 1s ease-in-out infinite; }
+        @keyframes dm-bob { 50% { transform: translateY(2px); } }
+        .text { display: inline-flex; align-items: baseline; gap: 5px;
+                max-width: 0; margin-left: 0; overflow: hidden;
+                transition: max-width .25s ease, margin-left .25s ease; }
+        button:hover .text, button.busy .text, button.ok .text, button.err .text {
+          max-width: 260px; margin-left: 6px; margin-right: 3px;
+        }
+        .sub { font-weight: 500; font-size: 11px; opacity: .8; }
         .sub:empty { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+          button, .text { transition: none; }
+          .busy svg { animation: none; }
+        }
       </style>
       <button type="button" part="button">
-        <svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
         <span class="text"><span class="label"></span><span class="sub"></span></span>
       </button>`;
     btn = root.querySelector("button");
@@ -79,8 +102,14 @@
     for (const t of ["mousedown", "mouseup", "pointerdown", "pointerup", "dblclick"]) {
       btn.addEventListener(t, (e) => e.stopPropagation(), true);
     }
-    host.addEventListener("mouseenter", () => clearTimeout(hideTimer));
-    host.addEventListener("mouseleave", scheduleHide);
+    host.addEventListener("mouseenter", () => {
+      hostHovered = true;
+      clearTimeout(hideTimer);
+    });
+    host.addEventListener("mouseleave", () => {
+      hostHovered = false;
+      scheduleHide();
+    });
     mount();
   }
 
@@ -98,9 +127,14 @@
 
   // ---------- Tracking the video under the pointer ----------
   let current = null; // video element the button belongs to
+  let currentKey = ""; // what it was shown for (see targetKey)
+  let currentInfo = null; // describe() result it was shown for
   let state = "idle"; // idle | busy | done
   let hideTimer = 0;
-  const cache = new WeakMap(); // video -> { at, src, result }
+  let hostHovered = false;
+  // Lookups by target key. Feeds reuse one <video> for every hover preview
+  // (YouTube's home page), so the element alone does not say which video it is.
+  const cache = new Map(); // key -> { at, result }
 
   function videoAt(x, y) {
     for (const v of videos) {
@@ -191,22 +225,54 @@
       if (!up || up === document.body || up.getElementsByTagName("video").length > 1) break;
       box = up;
     }
-    return { box, links: [...box.querySelectorAll("a[href]")].map((a) => a.href).slice(0, 40) };
+    // With a single <video> on the page (YouTube's hover preview) the climb
+    // reaches a page-wide container; its links belong to other videos.
+    const anchors = box.querySelectorAll("a[href]");
+    if (anchors.length > 60) return { box, links: [] };
+    return { box, links: [...anchors].map((a) => a.href).slice(0, 40) };
   }
 
-  /** Everything the extension needs to pick what to download for a video. */
-  function describe(video) {
+  /**
+   * Links under the point (x, y), topmost first. YouTube's home page plays
+   * its hover preview in a player laid over the thumbnail, outside the card,
+   * so the card's watch link is only found underneath the pointer.
+   */
+  function linksAt(x, y) {
+    const out = [];
+    if (x < 0 || y < 0) return out;
+    let stack = [];
+    try {
+      stack = document.elementsFromPoint(x, y);
+    } catch {
+      return out;
+    }
+    for (const el of stack) {
+      if (el === host || !el.closest) continue;
+      const a = el.closest("a[href]");
+      if (a && /^https?:/.test(a.href) && !out.includes(a.href)) out.push(a.href);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }
+
+  /**
+   * Everything the extension needs to pick what to download for a video.
+   * `x, y`: the pointer, when the video was found under it.
+   */
+  function describe(video, x = -1, y = -1) {
     const { box, links } = postOf(video);
-    return { pages: pageCandidates(video, box, links), direct: douyinFor(video, box, links) };
+    return { pages: pageCandidates(video, box, links, linksAt(x, y)), direct: douyinFor(video, box, links) };
   }
 
   /**
    * URLs that may be the page of this video, most specific first. Feeds
    * (TikTok "For You", Instagram, YouTube's home page) keep one URL for many
-   * videos, so the post around the video says which one it is. The extension
-   * keeps the first one that is a known video page.
+   * videos, so the post around the video, or the link under the pointer,
+   * says which one it is. The extension keeps the first one that is a known
+   * video page; the frame URL goes before the pointer's links so that on a
+   * watch page, a suggestion card over the player does not win.
    */
-  function pageCandidates(video, box, links) {
+  function pageCandidates(video, box, links, pointLinks = []) {
     const out = [];
     // TikTok's player sits in <div id="xgwrapper-0-<video id>">. yt-dlp
     // accepts any user name with the id.
@@ -226,8 +292,8 @@
         break;
       }
     }
-    out.push(location.href, ...links);
-    return out;
+    out.push(location.href, ...pointLinks, ...links);
+    return [...new Set(out)];
   }
 
   /** The video the user is most likely looking at: largest on screen. */
@@ -249,32 +315,46 @@
 
   // Popup and context menu: which video page is this frame showing?
   let contextVideo = null;
+  let contextPoint = [-1, -1];
   document.addEventListener(
     "contextmenu",
     (e) => {
       contextVideo = e.target instanceof HTMLVideoElement ? e.target : videoAt(e.clientX, e.clientY);
+      contextPoint = [e.clientX, e.clientY];
     },
     true,
   );
   ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type !== "dm-current-video") return false;
-    const v = (contextVideo && contextVideo.isConnected && contextVideo) || mainVideo();
+    let info;
+    if (contextVideo && contextVideo.isConnected) info = describe(contextVideo, ...contextPoint);
+    else if (current && current.isConnected && currentInfo) info = currentInfo;
+    else {
+      const v = mainVideo();
+      info = v ? describe(v) : { pages: [location.href], direct: null };
+    }
     contextVideo = null;
-    sendResponse(v ? describe(v) : { pages: [location.href], direct: null });
+    sendResponse(info);
     return false;
   });
 
-  async function lookup(video) {
-    const src = video.currentSrc || video.src || "";
-    const hit = cache.get(video);
-    if (hit && hit.src === src && Date.now() - hit.at < 4000) return hit.result;
+  /** Identifies what a button would download: the element is not enough. */
+  function targetKey(src, info) {
+    return [src, info.direct ? info.direct.id : "", ...info.pages.slice(0, 6)].join("\n");
+  }
+
+  async function lookup(key, src, info) {
+    const hit = cache.get(key);
+    // "Nothing found" is retried sooner: the player may still be loading.
+    if (hit && Date.now() - hit.at < (hit.result ? 8000 : 1500)) return hit.result;
     let result = null;
     try {
-      result = await ext.runtime.sendMessage({ type: "media-best", src, ...describe(video) });
+      result = await ext.runtime.sendMessage({ type: "media-best", src, ...info });
     } catch {
       /* extension reloaded */
     }
-    cache.set(video, { at: Date.now(), src, result });
+    cache.set(key, { at: Date.now(), result });
+    if (cache.size > 200) cache.delete(cache.keys().next().value);
     return result;
   }
 
@@ -282,24 +362,40 @@
     if (!host || !current) return;
     const r = current.getBoundingClientRect();
     if (r.bottom < 0 || r.top > innerHeight || r.width < MIN_W) return hide();
-    const top = Math.max(8, r.top + 12);
-    const right = Math.min(innerWidth - 8, r.right - 12);
+    const top = Math.max(8, r.top + 10);
+    const right = Math.min(innerWidth - 8, r.right - 10);
     host.style.top = `${top}px`;
     host.style.left = `${right}px`;
     host.style.transform = "translateX(-100%)";
   }
 
-  async function show(video) {
-    if (state !== "idle" && current === video) return;
-    const result = await lookup(video);
-    if (!result || !enabled) return;
+  let seq = 0; // newest lookup wins; older answers are dropped
+  let inflightKey = "";
+
+  async function show(video, key, src, info) {
+    const my = ++seq;
+    inflightKey = key;
+    const result = await lookup(key, src, info);
+    if (my !== seq) return;
+    inflightKey = "";
+    if (!enabled || state !== "idle") return;
+    if (!result) {
+      // Nothing to download here; do not leave the button on another target.
+      if (current) hide();
+      return;
+    }
     if (!host) build();
     mount();
+    // Same element, new target (or the same one found another way): update
+    // in place instead of replaying the fade-in.
+    const visible = current === video && host.style.display === "block";
     current = video;
-    state = "idle";
-    btn.className = "";
+    currentKey = key;
+    currentInfo = info;
+    if (!visible) btn.className = "";
     labelEl.textContent = tr("videoButton");
     subEl.textContent = result.label || "";
+    btn.title = result.label ? `${tr("videoButton")} · ${result.label}` : tr("videoButton");
     host.style.display = "block";
     place();
     requestAnimationFrame(() => btn.classList.add("show"));
@@ -311,6 +407,8 @@
     btn.classList.remove("show");
     host.style.display = "none";
     current = null;
+    currentKey = "";
+    currentInfo = null;
     state = "idle";
   }
 
@@ -319,32 +417,75 @@
     hideTimer = setTimeout(hide, HIDE_DELAY);
   }
 
-  let pending = false;
-  let lastX = 0;
-  let lastY = 0;
+  // ---------- When to look ----------
+  // On pointer moves, on scroll (the video under a still pointer changes), when
+  // a video starts loading or playing (hover previews), and every
+  // IDLE_CHECK_MS while the pointer rests on the page.
+  let lastX = -1;
+  let lastY = -1;
+  let pointerIn = false;
+  let lastEval = 0;
+  let evalQueued = false;
+
+  function evaluate() {
+    evalQueued = false;
+    lastEval = Date.now();
+    if (!enabled || !pointerIn || !videos.length) return;
+    const v = videoAt(lastX, lastY);
+    if (!v) {
+      if (current && !hostHovered) scheduleHide();
+      return;
+    }
+    clearTimeout(hideTimer);
+    if (state !== "idle") return; // keep "sending / sent / failed" on screen
+    const info = describe(v, lastX, lastY);
+    const src = v.currentSrc || v.src || "";
+    const key = targetKey(src, info);
+    if ((v === current && key === currentKey) || key === inflightKey) return;
+    show(v, key, src, info);
+  }
+
+  /** Run evaluate() at most every ~100 ms, on the next frame. */
+  function queueEvaluate() {
+    if (evalQueued) return;
+    evalQueued = true;
+    const wait = Math.max(0, 100 - (Date.now() - lastEval));
+    setTimeout(() => requestAnimationFrame(evaluate), wait);
+  }
+
   document.addEventListener(
     "mousemove",
     (e) => {
-      if (!enabled || !videos.length) return;
       lastX = e.clientX;
       lastY = e.clientY;
-      if (pending) return;
-      pending = true;
-      requestAnimationFrame(() => {
-        pending = false;
-        const v = videoAt(lastX, lastY);
-        if (v) {
-          clearTimeout(hideTimer);
-          if (v !== current) show(v);
-        } else if (current) {
-          scheduleHide();
-        }
-      });
+      pointerIn = true;
+      if (enabled && videos.length) queueEvaluate();
     },
     { passive: true, capture: true },
   );
-  addEventListener("scroll", () => current && place(), { passive: true, capture: true });
+  document.addEventListener(
+    "mouseout",
+    (e) => {
+      if (!e.relatedTarget) pointerIn = false; // left the window / frame
+    },
+    { passive: true, capture: true },
+  );
+  // Media events do not bubble, but capture listeners on the document see them.
+  for (const type of ["loadstart", "loadeddata", "playing"]) {
+    document.addEventListener(type, () => pointerIn && queueEvaluate(), { passive: true, capture: true });
+  }
+  addEventListener(
+    "scroll",
+    () => {
+      if (current) place();
+      if (pointerIn) queueEvaluate();
+    },
+    { passive: true, capture: true },
+  );
   addEventListener("resize", () => current && place(), { passive: true });
+  setInterval(() => {
+    if (pointerIn && enabled && videos.length && !document.hidden) queueEvaluate();
+  }, IDLE_CHECK_MS);
 
   async function onClick(e) {
     e.preventDefault();
@@ -353,12 +494,13 @@
     state = "busy";
     btn.className = "show busy";
     labelEl.textContent = tr("sending");
+    subEl.textContent = "";
     let res = null;
     try {
       res = await ext.runtime.sendMessage({
         type: "media-download-best",
         src: current.currentSrc || current.src || "",
-        ...describe(current),
+        ...(currentInfo || describe(current)),
       });
     } catch {
       /* extension reloaded */

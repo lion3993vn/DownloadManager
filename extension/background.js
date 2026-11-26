@@ -118,49 +118,114 @@ async function flashBadge(text, color, tabId) {
   }
 }
 
-ext.downloads.onCreated.addListener(async (item) => {
+/**
+ * Settings to send a browser download with, or null to let the browser keep
+ * it. Consumes the one-shot "skip next download".
+ */
+async function captureSettings(item) {
   const prefs = await dmSettings();
-  if (!prefs.enabled || item.incognito || item.state !== "in_progress") return;
+  if (!prefs.enabled || item.incognito || item.state !== "in_progress") return null;
   const url = item.finalUrl || item.url;
-  if (!/^https?:\/\//i.test(url)) return; // blob:, data:, file:
+  if (!/^https?:\/\//i.test(url)) return null; // blob:, data:, file:
   if (prefs.skipNext) {
     await ext.storage.local.set({ skipNext: false });
-    return;
+    return null;
   }
   const name = baseName(item.filename) || nameFromUrl(url);
-  if (!shouldCapture(item, name, prefs)) return;
-  const s = await pairedSettings();
-  if (!s) return;
+  if (!shouldCapture(item, name, prefs)) return null;
+  return pairedSettings();
+}
 
-  // Hold the browser download while we ask the app.
-  try {
-    await ext.downloads.pause(item.id);
-  } catch {
-    /* may already be complete */
-  }
-  const accepted = await sendToApp(s, {
-    url,
+function captureOf(item) {
+  return {
+    url: item.finalUrl || item.url,
     fileName: baseName(item.filename) || null,
     fileSize: item.totalBytes || item.fileSize,
     mime: item.mime,
     referrer: item.referrer,
-  });
-  if (accepted) {
-    try {
-      await ext.downloads.cancel(item.id);
-      await ext.downloads.erase({ id: item.id });
-    } catch {
-      /* ignore */
-    }
-    flashBadge("✓", "#16a34a");
-  } else {
-    try {
-      await ext.downloads.resume(item.id);
-    } catch {
-      /* ignore */
-    }
+  };
+}
+
+async function dropBrowserDownload(id) {
+  try {
+    await ext.downloads.cancel(id);
+  } catch {
+    /* already gone */
   }
-});
+  try {
+    await ext.downloads.erase({ id });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function downloadState(id) {
+  try {
+    const [item] = await ext.downloads.search({ id });
+    return item ? item.state : null;
+  } catch {
+    return null;
+  }
+}
+
+if (ext.downloads.onDeterminingFilename) {
+  // Chromium: decide before the file name is settled. Until suggest() is
+  // called the browser neither shows its "Save as" dialog nor finishes the
+  // file, so a small file cannot complete in the browser while the app is
+  // also fetching it (Google Drive), and the app's own folder choice is the
+  // only one. `item.filename` already holds the server's name here, which
+  // URLs like drive.usercontent.google.com/download?id=… do not carry.
+  ext.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      try {
+        suggest();
+      } catch {
+        /* download already gone */
+      }
+    };
+    // Never hold a download for long if something below hangs.
+    const guard = setTimeout(release, 15000);
+    (async () => {
+      const s = await captureSettings(item);
+      if (!s) return release();
+      const accepted = await sendToApp(s, captureOf(item));
+      if (!accepted) return release();
+      released = true; // the browser copy is dropped, never named
+      await dropBrowserDownload(item.id);
+      flashBadge("✓", "#16a34a");
+    })()
+      .catch(release)
+      .finally(() => clearTimeout(guard));
+    return true; // suggest() is called asynchronously
+  });
+} else {
+  // Firefox has no onDeterminingFilename: hold the download while we ask.
+  ext.downloads.onCreated.addListener(async (item) => {
+    const s = await captureSettings(item);
+    if (!s) return;
+    try {
+      await ext.downloads.pause(item.id);
+    } catch {
+      /* may already be complete */
+    }
+    // A small file can finish before the pause lands; the browser has it then.
+    if ((await downloadState(item.id)) === "complete") return;
+    const accepted = await sendToApp(s, captureOf(item));
+    if (accepted) {
+      await dropBrowserDownload(item.id);
+      flashBadge("✓", "#16a34a");
+    } else {
+      try {
+        await ext.downloads.resume(item.id);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+}
 
 function createMenu() {
   ext.contextMenus.removeAll(() => {

@@ -7,51 +7,121 @@
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body class="options">
-    <div class="wrap">
-      <div class="page-head">
+    <div class="page">
+      <header class="top">
         <div class="logo"><img src="icons/icon64.png" alt="" /></div>
-        <div>
+        <div class="text">
           <h1 data-i18n="extName">DownloadManager Connector</h1>
           <p data-i18n="optionsIntro">Chuyển lượt tải từ trình duyệt sang app để tải đa luồng.</p>
         </div>
-        <span id="version" class="version"></span>
+        <span id="version" class="pill"></span>
+      </header>
+
+      <!-- Connection -->
+      <section id="status" class="hero" data-state="checking">
+        <div class="hero-icon">
+          <svg class="i ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
+          <svg class="i warn" viewBox="0 0 24 24"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+          <svg class="i wait" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6" /></svg>
+        </div>
+        <div class="hero-text">
+          <div id="status-title" class="hero-title" data-i18n="statusChecking">Đang kiểm tra…</div>
+          <div id="status-desc" class="hero-desc" data-i18n="statusCheckingDesc">Đang tìm app DownloadManager trên máy.</div>
+        </div>
+        <div class="hero-actions">
+          <button id="pair" class="btn btn-primary" hidden data-i18n="pairAuto">Ghép cặp tự động</button>
+          <button id="recheck" class="btn" data-i18n="recheck">Kiểm tra lại</button>
+        </div>
+      </section>
+
+      <!-- Capture -->
+      <h2 class="group-title" data-i18n="captureHeading">Bắt lượt tải</h2>
+      <div class="group">
+        <label class="row">
+          <span class="tile blue">
+            <svg class="i" viewBox="0 0 24 24"><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></svg>
+          </span>
+          <span class="text">
+            <span class="title" data-i18n="enabledTitle">Tự chuyển lượt tải sang app</span>
+            <span class="desc" data-i18n="enabledDesc">Khi tắt, mọi lượt tải đều do trình duyệt xử lý.</span>
+          </span>
+          <span class="switch"><input type="checkbox" id="enabled" /><span class="track"></span></span>
+        </label>
       </div>
 
-      <section class="card">
-        <div class="card-head">
-          <span class="ico">
-            <svg class="i" viewBox="0 0 24 24">
-              <path d="M9 17H7A5 5 0 0 1 7 7h2" />
-              <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
-              <line x1="8" x2="16" y1="12" y2="12" />
-            </svg>
-          </span>
-          <h2 data-i18n="connectionHeading">Kết nối</h2>
-        </div>
-        <div class="card-body">
-          <div id="status" class="status status-card" data-state="checking">
-            <span class="dot"></span>
-            <div style="flex: 1">
-              <div id="status-title" class="title" data-i18n="statusChecking">Đang kiểm tra…</div>
-              <div id="status-desc" class="desc" data-i18n="statusCheckingDesc">Đang tìm app DownloadManager trên máy.</div>
-            </div>
-            <button id="pair" class="btn btn-primary" hidden data-i18n="pairAuto">Ghép cặp tự động</button>
-          </div>
+      <h2 class="group-title" data-i18n="fileTypesHeading">Loại tệp</h2>
+      <p class="group-hint" data-i18n="fileTypesHint">Bấm vào đuôi tệp để bật hoặc tắt.</p>
+      <div id="types" class="group"></div>
 
+      <div class="group">
+        <div class="row type-row">
+          <span class="tile slate">
+            <svg class="i" viewBox="0 0 24 24"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" /><path d="M3 10h18" /><path d="m16 19 2 2 4-4" /></svg>
+          </span>
+          <div class="text">
+            <span class="title" data-i18n="minSizeLabel">Cũng bắt mọi tệp lớn hơn</span>
+            <span class="desc" data-i18n="minSizeDesc">Kể cả tệp có đuôi không nằm trong danh sách.</span>
+            <div class="size-control">
+              <div id="size-presets" class="segmented" role="group"></div>
+              <div class="field affix size-custom">
+                <input id="minSizeMB" type="number" min="0" inputmode="numeric" />
+                <span class="suffix">MB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video -->
+      <h2 class="group-title" data-i18n="videoHeading">Video</h2>
+      <div class="group">
+        <label class="row">
+          <span class="tile rose">
+            <svg class="i" viewBox="0 0 24 24"><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" /></svg>
+          </span>
+          <span class="text">
+            <span class="title" data-i18n="videoButtonTitle">Hiện nút “Tải video” trên trang</span>
+            <span class="desc" data-i18n="videoButtonDesc">Rê chuột vào video để gửi sang app.</span>
+          </span>
+          <span class="preview" aria-hidden="true">
+            <span class="play"></span>
+            <span class="glass">
+              <svg class="i" viewBox="0 0 24 24"><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></svg>
+              <span data-i18n="videoButton">Tải video</span>
+            </span>
+          </span>
+          <span class="switch"><input type="checkbox" id="showVideoButton" /><span class="track"></span></span>
+        </label>
+      </div>
+      <div class="tip">
+        <svg class="i" viewBox="0 0 24 24">
+          <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+          <path d="M9 18h6" />
+          <path d="M10 22h4" />
+        </svg>
+        <span data-i18n-html="optionsTip">Chuột phải vào liên kết → <b>Tải bằng DownloadManager</b> để gửi bất kỳ tệp nào.</span>
+      </div>
+
+      <!-- Advanced -->
+      <h2 class="group-title" data-i18n="advancedHeading">Nâng cao</h2>
+      <details class="group">
+        <summary class="row">
+          <span class="tile slate">
+            <svg class="i" viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 0 1 7 7h2" /><path d="M15 7h2a5 5 0 1 1 0 10h-2" /><line x1="8" x2="16" y1="12" y2="12" /></svg>
+          </span>
+          <span class="text">
+            <span class="title" data-i18n="advancedTitle">Kết nối thủ công</span>
+            <span class="desc" data-i18n="advancedDesc">Mã ghép cặp, cổng, khôi phục mặc định</span>
+          </span>
+          <svg class="i chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+        </summary>
+        <div class="adv-body">
           <div class="grid-2">
             <div>
               <label class="field-label" for="token" data-i18n="tokenLabel">Mã ghép cặp</label>
               <div class="field affix">
-                <input
-                  id="token"
-                  type="password"
-                  class="mono"
-                  spellcheck="false"
-                  autocomplete="off"
-                  placeholder="Dán mã từ app"
-                  data-i18n-placeholder="tokenPlaceholder"
-                />
-                <button id="toggle-token" class="icon-btn" type="button" title="Hiện mã" aria-label="Hiện mã" data-i18n-title="showToken" data-i18n-aria-label="showToken">
+                <input id="token" type="password" class="mono" spellcheck="false" autocomplete="off" data-i18n-placeholder="tokenPlaceholder" />
+                <button id="toggle-token" class="icon-btn" type="button" data-i18n-title="showToken" data-i18n-aria-label="showToken">
                   <svg class="i" viewBox="0 0 24 24">
                     <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
                     <circle cx="12" cy="12" r="3" />
@@ -65,89 +135,18 @@
               <input id="port" class="field mono" type="number" min="1" max="65535" />
             </div>
           </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <span class="ico">
-            <svg class="i" viewBox="0 0 24 24">
-              <path d="M12 15V3" />
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <path d="m7 10 5 5 5-5" />
-            </svg>
-          </span>
-          <h2 data-i18n="captureHeading">Bắt lượt tải</h2>
-        </div>
-        <div class="card-body">
-          <label class="setting">
-            <span class="text">
-              <span class="title" data-i18n="enabledTitle">Tự chuyển lượt tải sang app</span>
-              <span class="desc" style="display: block" data-i18n="enabledDesc">Khi tắt, mọi lượt tải đều do trình duyệt xử lý.</span>
-            </span>
-            <span class="switch"><input type="checkbox" id="enabled" /><span class="track"></span></span>
-          </label>
-
-          <hr class="divider" />
-
-          <div>
-            <label class="field-label" for="ext-input">
-              <span data-i18n="extLabel">Đuôi tệp cần bắt</span> <span id="ext-count" style="font-weight: 400; color: var(--mute)"></span>
-            </label>
-            <div id="chips" class="field chips">
-              <input id="ext-input" spellcheck="false" autocomplete="off" placeholder="Thêm đuôi, vd: torrent" data-i18n-placeholder="extPlaceholder" />
-            </div>
-            <div class="field-help" data-i18n-html="extHelp">Nhấn <kbd>Enter</kbd> hoặc dấu cách để thêm, <kbd>Backspace</kbd> để xóa.</div>
-          </div>
-
-          <div style="max-width: 260px">
-            <label class="field-label" for="minSizeMB" data-i18n="minSizeLabel">Cũng bắt mọi tệp lớn hơn</label>
-            <div class="field affix">
-              <input id="minSizeMB" type="number" min="0" />
-              <span class="suffix">MB</span>
-            </div>
-            <div class="field-help" data-i18n="minSizeHelp">Đặt 0 để tắt.</div>
-          </div>
-
-          <hr class="divider" />
-
-          <label class="setting">
-            <span class="text">
-              <span class="title" data-i18n="videoButtonTitle">Hiện nút “Tải video” trên trang</span>
-              <span class="desc" style="display: block" data-i18n="videoButtonDesc">
-                Rê chuột vào video để gửi sang app. Hỗ trợ tệp video và luồng HLS (.m3u8). Danh sách video tìm thấy
-                luôn có trong cửa sổ của extension.
-              </span>
-            </span>
-            <span class="switch"><input type="checkbox" id="showVideoButton" /><span class="track"></span></span>
-          </label>
-
-          <div class="tip">
-            <svg class="i" viewBox="0 0 24 24">
-              <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-              <path d="M9 18h6" />
-              <path d="M10 22h4" />
-            </svg>
-            <span data-i18n-html="optionsTip">
-              Chuột phải vào liên kết → <b>Tải bằng DownloadManager</b> để gửi bất kỳ tệp nào. Nếu app không chạy,
-              trình duyệt sẽ tải như bình thường.
-            </span>
+          <div class="adv-foot">
+            <button id="reset" class="btn btn-danger" data-i18n="reset">Khôi phục mặc định</button>
           </div>
         </div>
-      </section>
+      </details>
+
+      <p class="foot-note" data-i18n="autoSaveNote">Thay đổi được lưu tự động.</p>
     </div>
 
-    <div class="actionbar">
-      <div class="inner">
-        <button id="reset" class="btn btn-ghost" data-i18n="reset">Khôi phục mặc định</button>
-        <span class="spacer"></span>
-        <span id="dirty" class="dirty-note" hidden data-i18n="dirty">Có thay đổi chưa lưu</span>
-        <span id="saved" class="saved">
-          <svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
-          <span data-i18n="saved">Đã lưu</span>
-        </span>
-        <button id="save" class="btn btn-primary" data-i18n="saveChanges">Lưu thay đổi</button>
-      </div>
+    <div id="toast" class="toast" role="status">
+      <svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
+      <span data-i18n="saved">Đã lưu</span>
     </div>
 
     <script src="common.js"></script>

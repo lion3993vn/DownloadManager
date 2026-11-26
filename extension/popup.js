@@ -4,10 +4,19 @@ dmApplyI18n();
 // Badge text of the "skip next" row (CSS `content: attr(data-on-label)`).
 document.querySelector("#skip-row .title").dataset.onLabel = dmT("skipActive");
 
-function setStatus(state, title, desc) {
+/**
+ * Header chip (short `chip` text) always; the notice card only when something
+ * needs attention.
+ */
+function setStatus(state, title, desc, chip) {
+  $("chip").dataset.state = state;
+  $("chip-text").textContent = dmT(
+    chip || { ok: "chipConnected", error: "chipError", checking: "chipChecking" }[state] || "chipOffline",
+  );
   $("status").dataset.state = state;
   $("status-title").textContent = title;
   $("status-desc").textContent = desc;
+  $("status").hidden = state === "ok" || (state === "checking" && $("status").hidden);
 }
 
 function renderSkip(on) {
@@ -49,7 +58,7 @@ async function refresh() {
     setStatus("warn", dmT("appNotRunning"), dmT("appNotRunningDesc"));
     $("pair").hidden = true;
   } else if (!paired) {
-    setStatus("warn", dmT("notPaired"), dmT("notPairedDesc"));
+    setStatus("warn", dmT("notPaired"), dmT("notPairedDesc"), "chipNotPaired");
     $("pair").hidden = false;
   } else {
     setStatus("ok", dmT("connected"), dmT("connectedDesc"));
@@ -138,7 +147,7 @@ function renderMedia(items) {
   const ordered = [...items.filter((i) => i.type === "page"), ...items.filter((i) => i.type !== "page").reverse()];
   for (const item of ordered) {
     const li = el("li", "media-item");
-    const icon = el("span", `media-icon ${item.type}`);
+    const icon = el("span", `tile ${item.type === "audio" ? "fuchsia" : item.type === "hls" ? "violet" : "rose"}`);
     icon.innerHTML = `<svg class="i" viewBox="0 0 24 24">${ICONS[item.type] || ICONS.video}</svg>`;
 
     const text = el("div", "media-text");
@@ -193,7 +202,13 @@ async function download(item) {
   refreshMedia();
   const res = await ext.runtime.sendMessage({ type: "media-download", tabId, id: item.id });
   sendState.set(item.id, res && res.ok ? "ok" : "err");
-  if (!(res && res.ok)) setStatus("error", dmT("sendVideoFailed"), (res && res.error) || dmT("tryAgain"));
+  if (!(res && res.ok)) {
+    // The connection itself may be fine: leave the header chip alone.
+    $("status").dataset.state = "error";
+    $("status-title").textContent = dmT("sendVideoFailed");
+    $("status-desc").textContent = (res && res.error) || dmT("tryAgain");
+    $("status").hidden = false;
+  }
   lastJson = "";
   refreshMedia();
 }

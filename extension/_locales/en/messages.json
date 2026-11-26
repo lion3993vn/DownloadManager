@@ -123,9 +123,6 @@
   "optionsIntro": {
     "message": "Send browser downloads to the app for multi-connection downloading."
   },
-  "connectionHeading": {
-    "message": "Connection"
-  },
   "pairAuto": {
     "message": "Pair automatically"
   },
@@ -156,15 +153,8 @@
   "enabledDesc": {
     "message": "When off, the browser handles every download."
   },
-  "extLabel": {
-    "message": "File extensions to capture"
-  },
   "extPlaceholder": {
     "message": "Add an extension, e.g. torrent"
-  },
-  "extHelp": {
-    "message": "Press <kbd>Enter</kbd> or Space to add, <kbd>Backspace</kbd> to remove.",
-    "description": "HTML"
   },
   "removeExt": {
     "message": "Remove .$1",
@@ -172,9 +162,6 @@
   },
   "minSizeLabel": {
     "message": "Also capture any file larger than"
-  },
-  "minSizeHelp": {
-    "message": "Set to 0 to turn off."
   },
   "videoButtonTitle": {
     "message": "Show the “Download video” button on pages"
@@ -189,14 +176,8 @@
   "reset": {
     "message": "Restore defaults"
   },
-  "dirty": {
-    "message": "Unsaved changes"
-  },
   "saved": {
     "message": "Saved"
-  },
-  "saveChanges": {
-    "message": "Save changes"
   },
   "optNotRunning": {
     "message": "The app is not running"
@@ -256,5 +237,74 @@
   },
   "openApp": {
     "message": "Open DownloadManager"
+  },
+  "recheck": {
+    "message": "Check again"
+  },
+  "fileTypesHeading": {
+    "message": "File types"
+  },
+  "fileTypesHint": {
+    "message": "Downloads with a highlighted extension go to the app. Click an extension to turn it on or off."
+  },
+  "type_archive": {
+    "message": "Archives & disk images"
+  },
+  "type_program": {
+    "message": "Programs"
+  },
+  "type_video": {
+    "message": "Video"
+  },
+  "type_audio": {
+    "message": "Audio"
+  },
+  "type_document": {
+    "message": "Documents"
+  },
+  "type_other": {
+    "message": "Other extensions"
+  },
+  "typeCount": {
+    "message": "$1/$2"
+  },
+  "typeToggleAll": {
+    "message": "Turn all of $1 on or off"
+  },
+  "minSizeDesc": {
+    "message": "Even when the extension is not in the list above."
+  },
+  "sizeOff": {
+    "message": "Off"
+  },
+  "videoHeading": {
+    "message": "Video"
+  },
+  "advancedHeading": {
+    "message": "Advanced"
+  },
+  "advancedTitle": {
+    "message": "Manual connection"
+  },
+  "advancedDesc": {
+    "message": "Pairing code, port, restore defaults"
+  },
+  "autoSaveNote": {
+    "message": "Changes are saved automatically."
+  },
+  "chipConnected": {
+    "message": "Connected"
+  },
+  "chipOffline": {
+    "message": "App offline"
+  },
+  "chipNotPaired": {
+    "message": "Not paired"
+  },
+  "chipError": {
+    "message": "Error"
+  },
+  "chipChecking": {
+    "message": "Checking"
   }
 }

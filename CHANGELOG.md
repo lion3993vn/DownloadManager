@@ -9,6 +9,14 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 ### ✨ Tính năng mới
 - **Giao diện tiếng Anh.** App, menu khay hệ thống và extension có thêm tiếng Anh. App tự theo ngôn ngữ của hệ điều hành; đổi trong *Cài đặt → Giao diện → Ngôn ngữ*. Extension theo ngôn ngữ của trình duyệt.
 
+### 🔧 Cải tiến
+- **Nút "Tải video" gọn hơn**, kiểu kính mờ: chỉ là một biểu tượng nhỏ ở góc video, rê chuột vào mới hiện chữ.
+- **Trang tùy chọn và cửa sổ của extension được thiết kế lại.** Đuôi tệp được chia theo nhóm (tệp nén, chương trình, video, âm thanh, tài liệu), bấm để bật/tắt từng đuôi hoặc cả nhóm. Chọn nhanh ngưỡng dung lượng. Mọi thay đổi được lưu ngay.
+
+### 🐛 Sửa lỗi
+- Trang chủ YouTube: rê qua nhiều video rồi dừng lại ở một video thì không hiện nút tải. Giờ nút hiện đúng video đang xem trước.
+- Chrome/Edge: tải từ Google Drive (và mọi trang khi bật "Hỏi nơi lưu tệp") vẫn hiện hộp thoại chọn nơi lưu, hoặc trình duyệt tải xong một bản trong khi app cũng tải lại. Giờ lượt tải được chuyển sang app trước khi trình duyệt kịp hỏi hay tải.
+
 ## [0.5.1] - 2026-11-24
 
 ### 🔧 Cải tiến
