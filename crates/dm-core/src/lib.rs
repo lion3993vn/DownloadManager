@@ -25,6 +25,6 @@ mod types;
 
 pub use engine::Engine;
 pub use error::{Error, Result};
-pub use media::{MediaTools, DEFAULT_QUALITY as DEFAULT_MEDIA_QUALITY};
+pub use media::{is_media_site, MediaTools, DEFAULT_QUALITY as DEFAULT_MEDIA_QUALITY};
 pub use planner::plan_segments;
 pub use types::*;

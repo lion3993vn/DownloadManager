@@ -1,0 +1,43 @@
+// "When done" menu and countdown (components/WhenDone.tsx), unzip toasts.
+import { defineMessages } from "../define";
+
+export default defineMessages({
+  vi: {
+    "finish.button": "Khi tải xong",
+    "finish.menuTitle": "Khi tải xong tất cả",
+    "finish.nothing": "Không làm gì",
+    "finish.sleep": "Cho máy ngủ",
+    "finish.shutdown": "Tắt máy",
+    "finish.quit": "Thoát app",
+    "finish.menuHint": "Chạy một lần khi không còn tệp nào đang tải hoặc chờ, sau 60 giây đếm ngược. Không được lưu khi tắt app.",
+    "finish.countdownSleep": "Sắp cho máy ngủ",
+    "finish.countdownShutdown": "Sắp tắt máy",
+    "finish.countdownQuit": "Sắp thoát app",
+    "finish.countdownSubtitle": "Mọi lượt tải đã xong.",
+    "finish.seconds": "giây",
+    "finish.now": "Làm ngay",
+    "finish.failed": "Không thực hiện được: {error}",
+    "finish.extracted": "Đã giải nén",
+    "finish.extractFailed": "Không giải nén được {name}",
+    "finish.openFolder": "Mở thư mục",
+  },
+  en: {
+    "finish.button": "When done",
+    "finish.menuTitle": "When everything is downloaded",
+    "finish.nothing": "Do nothing",
+    "finish.sleep": "Sleep",
+    "finish.shutdown": "Shut down",
+    "finish.quit": "Quit the app",
+    "finish.menuHint": "Runs once, when nothing is downloading or queued, after a 60-second countdown. Not kept when the app closes.",
+    "finish.countdownSleep": "Going to sleep",
+    "finish.countdownShutdown": "Shutting down",
+    "finish.countdownQuit": "Quitting the app",
+    "finish.countdownSubtitle": "All downloads are done.",
+    "finish.seconds": "seconds",
+    "finish.now": "Do it now",
+    "finish.failed": "Could not do it: {error}",
+    "finish.extracted": "Unpacked",
+    "finish.extractFailed": "Could not unpack {name}",
+    "finish.openFolder": "Open folder",
+  },
+});

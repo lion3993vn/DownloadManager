@@ -4,7 +4,7 @@ import { api, isMediaToolsMissing, type Capture, type ProbeResult, type RequestH
 import { errorText, formatBytes, formatDuration, hostOf, isProbablyUrl, resolutionLabel } from "../lib/format";
 import { Field, Modal } from "./Modal";
 import { FileTile } from "./FileTile";
-import { AlertIcon, BoltIcon, FolderIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
+import { AlertIcon, BoltIcon, ClipboardIcon, FolderIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
 import { ToolsInstallCard } from "./MediaTools";
 import { useT, type TFunction } from "../i18n";
 
@@ -49,6 +49,8 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   const [fileName, setFileName] = useState(capture?.fileName ?? "");
   const [nameTouched, setNameTouched] = useState(Boolean(capture?.fileName));
   const [saveDir, setSaveDir] = useState(defaultDir);
+  // Chosen by hand: stop following the file type ("sort by type").
+  const [dirTouched, setDirTouched] = useState(false);
   const [connections, setConnections] = useState(defaultConnections);
   const [probe, setProbe] = useState<ProbeState>({ kind: "idle" });
   // Video pages: chosen quality, and a counter to probe again after installing yt-dlp.
@@ -97,7 +99,10 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
 
   async function pickFolder() {
     const dir = await open({ directory: true, defaultPath: saveDir || undefined });
-    if (typeof dir === "string") setSaveDir(dir);
+    if (typeof dir === "string") {
+      setSaveDir(dir);
+      setDirTouched(true);
+    }
   }
 
   async function submit(startPaused: boolean) {
@@ -110,8 +115,8 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
         connections,
         headers,
         startPaused,
-        kind: media ? "media" : stream ? "hls" : (capture?.kind ?? null),
-        mediaQuality: media ? quality : null,
+        kind: downloadKind,
+        mediaQuality,
       });
       onAdded(d.fileName, !startPaused);
       onClose();
@@ -130,6 +135,22 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
   const size = media ? (picked?.estimatedSize ?? null) : probe.kind === "ok" ? probe.result.totalSize : (capture?.fileSize ?? null);
   const blocked = Boolean(stream?.live || media?.isLive || toolsMissing);
   const videoSite = VIDEO_SITE.test(url);
+  const downloadKind = media ? "media" : stream ? "hls" : (capture?.kind ?? null);
+  const mediaQuality = media ? quality : null;
+
+  // "Sort by type": the folder follows the file type (the app knows the
+  // folders; without sorting this is the download folder).
+  useEffect(() => {
+    if (dirTouched) return;
+    let stale = false;
+    api
+      .categoryDir(fileName, downloadKind, mediaQuality)
+      .then((dir) => !stale && setSaveDir(dir))
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, [fileName, downloadKind, mediaQuality, dirTouched]);
 
   function pickQuality(id: string) {
     setQuality(id);
@@ -138,12 +159,27 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
     setFileName((n) => withExt(n, id === "audio" ? (audio?.label === "MP3" ? "mp3" : "m4a") : "mp4"));
   }
   const shownName = fileName || (valid ? "…" : "");
+  const fromClipboard = capture?.source === "clipboard";
 
   return (
     <Modal
-      title={capture ? (capture.kind === "media" ? t("add.titleCaptureMedia") : t("add.titleCapture")) : t("add.title")}
-      subtitle={capture ? t("add.from", { host: hostOf(capture.referrer || capture.url) }) : t("add.subtitle")}
-      icon={capture ? <PuzzleIcon /> : <LinkIcon />}
+      title={
+        fromClipboard
+          ? t("add.titleClipboard")
+          : capture
+            ? capture.kind === "media"
+              ? t("add.titleCaptureMedia")
+              : t("add.titleCapture")
+            : t("add.title")
+      }
+      subtitle={
+        fromClipboard
+          ? t("add.fromClipboard")
+          : capture
+            ? t("add.from", { host: hostOf(capture.referrer || capture.url) })
+            : t("add.subtitle")
+      }
+      icon={fromClipboard ? <ClipboardIcon /> : capture ? <PuzzleIcon /> : <LinkIcon />}
       onClose={onClose}
       width="max-w-[560px]"
       footer={
@@ -295,7 +331,14 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           <div className="flex gap-2">
             <div className="relative flex-1">
               <FolderIcon className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
-              <input className="field pl-10" value={saveDir} onChange={(e) => setSaveDir(e.target.value)} />
+              <input
+                className="field pl-10"
+                value={saveDir}
+                onChange={(e) => {
+                  setSaveDir(e.target.value);
+                  setDirTouched(true);
+                }}
+              />
             </div>
             <button type="button" className="btn-outline" onClick={pickFolder}>
               {t("add.browse")}

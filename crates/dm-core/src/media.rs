@@ -68,7 +68,7 @@ const SITES: &[&str] = &[
     "twitch.tv",
 ];
 
-pub(crate) fn is_media_site(url: &str) -> bool {
+pub fn is_media_site(url: &str) -> bool {
     let Ok(u) = reqwest::Url::parse(url) else {
         return false;
     };

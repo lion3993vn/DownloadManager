@@ -8,6 +8,12 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 
 ## [Unreleased]
 
+### ✨ New features
+- **Catch copied links.** Copy a link to a file (zip, exe, mp4, pdf…) anywhere and the app asks whether to download it. Video page links (YouTube, TikTok…) can be included too. *Settings → Automation*.
+- **Sort files into folders by type.** Videos, music, archives, documents, programs and images go to their own folders inside the download folder (names or full paths can be changed). Off by default; turn it on in *Settings → Automation*.
+- **When done: sleep, shut down or quit.** Pick it with the new **When done** button above the download list. It runs once the last download finishes, after a 60-second countdown you can cancel, and is not kept when the app closes.
+- **Unpack .zip files** automatically when they finish, into a folder next to the zip. *Settings → Automation*.
+
 ### 🔧 Improvements
 - **The extension follows the app's language.** Switch between English and Vietnamese in the app (*Settings → Appearance → Language*) and the extension's popup, options page, "Download video" button and right-click menu switch too, within a few seconds, whatever language the browser uses.
 

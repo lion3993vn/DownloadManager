@@ -32,3 +32,4 @@ sha2 = "0.10"
 futures-util = { workspace = true }
 auto-launch = "0.6"
 sys-locale = "0.3"
+arboard = { version = "3", default-features = false }

@@ -4,8 +4,14 @@ import { api, type BridgeStatus, type Settings } from "../lib/api";
 import type { ThemePref } from "../lib/theme";
 import { Field, Modal, Switch } from "./Modal";
 import {
+  AppIcon,
+  ArchiveIcon,
+  BoltIcon,
   CopyIcon,
+  DocIcon,
   DownloadIcon,
+  ImageIcon,
+  MusicIcon,
   FolderIcon,
   InfoIcon,
   MonitorIcon,
@@ -32,16 +38,31 @@ interface Props {
   onChangelog: () => void;
 }
 
-type Tab = "download" | "video" | "browser" | "app" | "about";
+type Tab = "download" | "auto" | "video" | "browser" | "app" | "about";
 type IconT = ComponentType<SVGProps<SVGSVGElement>>;
 
 const TABS: { key: Tab; label: MessageKey; icon: IconT }[] = [
   { key: "download", label: "settings.tab.download", icon: DownloadIcon },
+  { key: "auto", label: "settings.tab.auto", icon: BoltIcon },
   { key: "video", label: "settings.tab.video", icon: VideoIcon },
   { key: "browser", label: "settings.tab.browser", icon: PuzzleIcon },
   { key: "app", label: "settings.tab.app", icon: SettingsIcon },
   { key: "about", label: "settings.tab.about", icon: InfoIcon },
 ];
+
+/** Per-type folders ("sort by type"); defaults match categories.rs. */
+const CATEGORIES: { key: string; label: MessageKey; icon: IconT; folder: string }[] = [
+  { key: "video", label: "sidebar.type.video", icon: VideoIcon, folder: "Video" },
+  { key: "audio", label: "sidebar.type.audio", icon: MusicIcon, folder: "Music" },
+  { key: "archive", label: "sidebar.type.archive", icon: ArchiveIcon, folder: "Compressed" },
+  { key: "document", label: "sidebar.type.document", icon: DocIcon, folder: "Documents" },
+  { key: "program", label: "sidebar.type.program", icon: AppIcon, folder: "Programs" },
+  { key: "image", label: "sidebar.type.image", icon: ImageIcon, folder: "Images" },
+];
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 className="mt-5 mb-1 text-[11.5px] font-semibold tracking-wide text-mute uppercase first:mt-0">{children}</h3>;
+}
 
 function Row({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -145,7 +166,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
           ))}
         </nav>
 
-        <div className="px-6 py-4">
+        <div className="@container px-6 py-4">
           {tab === "video" && <MediaToolsPanel onError={onError} />}
           {tab === "download" && (
             <>
@@ -196,6 +217,50 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                   </div>
                 </Row>
               </div>
+            </>
+          )}
+
+          {tab === "auto" && (
+            <>
+              <SectionTitle>{t("settings.clipboardHeading")}</SectionTitle>
+              <Row title={t("settings.clipboard")} hint={t("settings.clipboardHint")}>
+                <Switch checked={s.app.clipboardMonitor} onChange={(v) => setApp({ clipboardMonitor: v })} />
+              </Row>
+              {s.app.clipboardMonitor && (
+                <Row title={t("settings.clipboardMedia")} hint={t("settings.clipboardMediaHint")}>
+                  <Switch checked={s.app.clipboardMedia} onChange={(v) => setApp({ clipboardMedia: v })} />
+                </Row>
+              )}
+
+              <SectionTitle>{t("settings.sortHeading")}</SectionTitle>
+              <Row title={t("settings.sortByType")} hint={t("settings.sortByTypeHint")}>
+                <Switch checked={s.app.sortByType} onChange={(v) => setApp({ sortByType: v })} />
+              </Row>
+              {s.app.sortByType && (
+                <div className="mt-1 mb-2">
+                  <div className="grid grid-cols-1 gap-2 @[560px]:grid-cols-2">
+                    {CATEGORIES.map(({ key, label, icon: Icon, folder }) => (
+                      <label key={key} className="flex items-center gap-2.5 rounded-lg border border-line bg-panel/50 py-1.5 pr-1.5 pl-3">
+                        <Icon className="h-4 w-4 shrink-0 text-mute" />
+                        <span className="w-24 shrink-0 truncate text-[12.5px] text-ink-2">{t(label)}</span>
+                        <input
+                          className="field min-w-0 py-1 text-[12.5px]"
+                          value={s.app.categoryDirs[key] ?? ""}
+                          placeholder={folder}
+                          onChange={(e) => setApp({ categoryDirs: { ...s.app.categoryDirs, [key]: e.target.value } })}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[12px] text-mute">{t("settings.categoryDirsHint", { dir: eng.downloadDir })}</p>
+                </div>
+              )}
+
+              <SectionTitle>{t("settings.afterHeading")}</SectionTitle>
+              <Row title={t("settings.extractZip")} hint={t("settings.extractZipHint")}>
+                <Switch checked={s.app.extractZip} onChange={(v) => setApp({ extractZip: v })} />
+              </Row>
+              <p className="mt-2 rounded-lg bg-panel/60 px-3 py-2 text-[12px] text-mute">{t("settings.whenDoneHint")}</p>
             </>
           )}
 

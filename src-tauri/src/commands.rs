@@ -136,6 +136,11 @@ pub fn save_settings(
         // The token and port are managed separately.
         app.confirm_captures = settings.app.confirm_captures;
         app.close_to_tray = settings.app.close_to_tray;
+        app.clipboard_monitor = settings.app.clipboard_monitor;
+        app.clipboard_media = settings.app.clipboard_media;
+        app.sort_by_type = settings.app.sort_by_type;
+        app.category_dirs = settings.app.category_dirs;
+        app.extract_zip = settings.app.extract_zip;
         if app.language != settings.app.language {
             app.language = settings.app.language;
             i18n::set_preference(&app.language);

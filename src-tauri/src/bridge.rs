@@ -242,6 +242,16 @@ async fn capture(
         let _ = app.emit("dm://capture", ());
         show_main_window(&app);
     } else if let Err(e) = state.engine.add(NewDownload {
+        // Sorting by type: the extension now sends the real file name.
+        save_dir: crate::categories::save_dir_for(
+            &state.app_settings(),
+            &state.engine.settings().download_dir,
+            c.file_name
+                .as_deref()
+                .unwrap_or(&dm_core::naming::name_from_url(&c.url)),
+            c.kind,
+            None,
+        ),
         url: c.url,
         file_name: c.file_name,
         headers: c.headers,

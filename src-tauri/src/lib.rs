@@ -1,7 +1,10 @@
 mod autostart;
 mod bridge;
+mod categories;
+mod clipboard;
 mod commands;
 mod extension_setup;
+mod finish;
 mod i18n;
 mod media_tools;
 mod state;
@@ -42,6 +45,7 @@ pub fn run() {
             tray::setup(app.handle())?;
             updater::spawn_periodic_check(app.handle().clone());
             media_tools::start(app.handle());
+            clipboard::start(app.handle());
             // The window is created hidden (`visible: false`); a launch at
             // login stays in the tray.
             if !autostart::launched_at_login() {
@@ -90,6 +94,12 @@ pub fn run() {
             commands::install_update,
             commands::list_releases,
             commands::open_url,
+            categories::category_dir,
+            finish::get_when_done,
+            finish::set_when_done,
+            finish::cancel_when_done,
+            finish::when_done_now,
+            finish::open_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the application");
@@ -112,6 +122,7 @@ fn forward_events(app: tauri::AppHandle, engine: Engine) {
                 Ok(event) => {
                     if let EngineEvent::Updated { download } = &event {
                         tray::on_download_updated(&app, download);
+                        finish::on_download_updated(&app, download);
                     }
                     let _ = app.emit("dm://event", &event);
                 }

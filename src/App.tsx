@@ -3,6 +3,7 @@ import {
   api,
   onCapture,
   onExtensionConnected,
+  onExtracted,
   onExtensionUpdated,
   onPairRequest,
   outdatedExtensions,
@@ -31,6 +32,7 @@ import { StatsPage } from "./components/StatsPage";
 import { CUSTOM_TITLEBAR, Titlebar } from "./components/Titlebar";
 import { StatsBar } from "./components/StatsBar";
 import { Toasts, useToasts } from "./components/Toasts";
+import { WhenDoneCountdown, WhenDoneMenu } from "./components/WhenDone";
 import {
   CopyIcon,
   DownloadIcon,
@@ -170,12 +172,26 @@ export default function App() {
           push({ kind: "success", title: tr("app.extUpdated", { browser: e.browser }), body: tr("app.extUpdatedBody", { version: e.version ?? "" }) });
         }
       }),
+      // A finished .zip was unpacked (setting "Unpack .zip files").
+      onExtracted((x) => {
+        const dir = x.dir;
+        if (dir) {
+          push({
+            kind: "success",
+            title: tr("finish.extracted"),
+            body: x.fileName,
+            action: { label: tr("finish.openFolder"), run: () => api.openFolder(dir).catch((e) => showError(String(e))) },
+          });
+        } else {
+          push({ kind: "error", title: tr("finish.extractFailed", { name: x.fileName }), body: x.error ?? undefined });
+        }
+      }),
     ];
     return () => {
       clearInterval(t);
       subs.forEach((u) => u.then((f) => f()));
     };
-  }, [push]);
+  }, [push, showError]);
 
   const all = useMemo(() => [...rows.values()].sort((a, b) => b.id - a.id), [rows]);
   const totalSpeed = all.reduce((sum, r) => sum + (r.status === "downloading" ? r.speed : 0), 0);
@@ -343,6 +359,7 @@ export default function App() {
                 <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title={t("app.pauseAll")}>
                   <PauseIcon /> <span className="hidden @[700px]:inline">{t("app.pauseAllShort")}</span>
                 </button>
+                <WhenDoneMenu onError={showError} />
               </header>
 
               <StatsBar
@@ -445,6 +462,7 @@ export default function App() {
           }}
         />
       )}
+      <WhenDoneCountdown onError={showError} />
       <Toasts toasts={toasts} dismiss={dismiss} />
     </div>
   );

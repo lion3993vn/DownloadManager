@@ -2,7 +2,7 @@
 
 use dm_core::{DownloadKind, Engine, RequestHeaders};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, RwLock};
 use tokio::sync::oneshot;
@@ -23,6 +23,17 @@ pub struct AppSettings {
     pub close_to_tray: bool,
     /// UI language: "auto" (follow the OS), "vi" or "en".
     pub language: String,
+    /// Offer to download links copied to the clipboard (clipboard.rs).
+    pub clipboard_monitor: bool,
+    /// Also video-page links (YouTube, TikTok…), not only links to files.
+    pub clipboard_media: bool,
+    /// Save each download in a sub-folder for its type (categories.rs).
+    pub sort_by_type: bool,
+    /// Folder per type ("video", "audio", "archive", "document", "program",
+    /// "image"): a name inside the download folder, or an absolute path.
+    pub category_dirs: BTreeMap<String, String>,
+    /// Unpack finished `.zip` files into a folder next to them (finish.rs).
+    pub extract_zip: bool,
 }
 
 impl Default for AppSettings {
@@ -33,6 +44,11 @@ impl Default for AppSettings {
             confirm_captures: true,
             close_to_tray: true,
             language: "auto".into(),
+            clipboard_monitor: true,
+            clipboard_media: false,
+            sort_by_type: false,
+            category_dirs: crate::categories::default_dirs(),
+            extract_zip: false,
         }
     }
 }
@@ -87,6 +103,9 @@ pub struct Capture {
     pub kind: Option<DownloadKind>,
     #[serde(flatten)]
     pub headers: RequestHeaders,
+    /// Where it came from: `None` = the browser extension, `"clipboard"`.
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 /// A browser extension asking for the bridge token.
@@ -106,6 +125,11 @@ pub struct AppState {
     pub pair_requests: Mutex<HashMap<u64, (PairRequest, oneshot::Sender<bool>)>>,
     /// Browser extensions that have talked to us with a valid token.
     pub extensions: Mutex<Vec<ConnectedExtension>>,
+    /// What to do once the queue is done (finish.rs). Not saved: a forgotten
+    /// "shut down" must not survive a restart.
+    pub when_done: Mutex<crate::finish::WhenDone>,
+    /// Bumped to cancel a pending "when done" countdown.
+    pub when_done_generation: AtomicU64,
     next_id: AtomicU64,
 }
 
@@ -196,6 +220,8 @@ impl AppState {
             captures: Mutex::new(Vec::new()),
             pair_requests: Mutex::new(HashMap::new()),
             extensions: Mutex::new(extensions),
+            when_done: Mutex::new(crate::finish::WhenDone::Nothing),
+            when_done_generation: AtomicU64::new(0),
             next_id: AtomicU64::new(1),
         }
     }

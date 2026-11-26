@@ -11,6 +11,7 @@ import media from "./media";
 import wizard from "./wizard";
 import changelog from "./changelog";
 import stats from "./stats";
+import finish from "./finish";
 
 export const vi = {
   ...core.vi,
@@ -24,6 +25,7 @@ export const vi = {
   ...wizard.vi,
   ...changelog.vi,
   ...stats.vi,
+  ...finish.vi,
 };
 
 export type MessageKey = keyof typeof vi;
@@ -40,4 +42,5 @@ export const en: Record<MessageKey, Msg> = {
   ...wizard.en,
   ...changelog.en,
   ...stats.en,
+  ...finish.en,
 };

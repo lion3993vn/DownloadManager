@@ -5,6 +5,8 @@ export default defineMessages({
   vi: {
     "add.titleCaptureMedia": "Tải video từ trình duyệt",
     "add.titleCapture": "Bắt được tệp từ trình duyệt",
+    "add.titleClipboard": "Tải link vừa sao chép?",
+    "add.fromClipboard": "Link trong clipboard. Tắt tính năng này trong Cài đặt → Tự động.",
     "add.title": "Thêm liên kết tải",
     "add.from": "Từ {host}",
     "add.subtitle": "Dán liên kết tệp hoặc trang video (YouTube, TikTok…)",
@@ -33,6 +35,8 @@ export default defineMessages({
   en: {
     "add.titleCaptureMedia": "Download video from browser",
     "add.titleCapture": "File captured from browser",
+    "add.titleClipboard": "Download the link you copied?",
+    "add.fromClipboard": "Link from the clipboard. Turn this off in Settings → Automation.",
     "add.title": "Add download",
     "add.from": "From {host}",
     "add.subtitle": "Paste a file link or a video page (YouTube, TikTok…)",

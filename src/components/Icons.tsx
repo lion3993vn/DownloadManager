@@ -181,6 +181,24 @@ export const MoonIcon = (p: P) => (
     <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" />
   </Icon>
 );
+export const PowerIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 2v10" />
+    <path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+  </Icon>
+);
+export const LogOutIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </Icon>
+);
+export const FlagIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.33 2q2 0 3.67-.8a1 1 0 0 1 1.4.9v9.8a1 1 0 0 1-.4.8 6 6 0 0 1-4 1.3c-2.33 0-4.33-2-7.33-2q-2 0-3.67.8" />
+  </Icon>
+);
 export const MonitorIcon = (p: P) => (
   <Icon {...p}>
     <rect x="3" y="4" width="18" height="12" rx="2" />

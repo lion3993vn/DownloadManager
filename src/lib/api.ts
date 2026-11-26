@@ -138,6 +138,30 @@ export interface AppSettings {
   closeToTray: boolean;
   /** UI language preference: "auto" (follow the OS), "vi" or "en". */
   language: string;
+  /** Offer to download file links copied to the clipboard. */
+  clipboardMonitor: boolean;
+  /** Also video-page links (YouTube, TikTok…). */
+  clipboardMedia: boolean;
+  /** Save each download in a sub-folder for its type. */
+  sortByType: boolean;
+  /** Type ("video", "audio", "archive", "document", "program", "image") -> folder name or absolute path. */
+  categoryDirs: Record<string, string>;
+  /** Unpack finished .zip files into a folder next to them. */
+  extractZip: boolean;
+}
+
+/** What to do once every download is done (not saved across restarts). */
+export type WhenDone = "nothing" | "sleep" | "shutdown" | "quit";
+
+export interface WhenDoneCountdown {
+  action: WhenDone;
+  seconds: number;
+}
+
+export interface Extracted {
+  fileName: string;
+  dir: string | null;
+  error: string | null;
 }
 
 export interface Settings {
@@ -160,6 +184,8 @@ export interface Capture extends RequestHeaders {
   fileSize?: number | null;
   mime?: string | null;
   kind?: DownloadKind | null;
+  /** null: the browser extension. */
+  source?: "clipboard" | null;
 }
 
 export interface PairRequest {
@@ -246,6 +272,14 @@ export const api = {
   installUpdate: () => invoke<void>("install_update"),
   listReleases: () => invoke<ReleaseInfo[]>("list_releases"),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
+  /** Folder for a new download, with "sort by type" applied. */
+  categoryDir: (fileName: string, kind: DownloadKind | null, mediaQuality: string | null) =>
+    invoke<string>("category_dir", { fileName, kind, mediaQuality }),
+  getWhenDone: () => invoke<WhenDone>("get_when_done"),
+  setWhenDone: (action: WhenDone) => invoke<void>("set_when_done", { action }),
+  cancelWhenDone: () => invoke<void>("cancel_when_done"),
+  whenDoneNow: () => invoke<void>("when_done_now"),
+  openFolder: (path: string) => invoke<void>("open_folder", { path }),
 };
 
 export const onEngineEvent = (cb: (e: EngineEvent) => void): Promise<UnlistenFn> =>
@@ -298,3 +332,22 @@ export function outdatedExtensions(list: ConnectedExtension[], bundled: string |
   }
   return [...latest.values()].filter((e) => !e.version || compareVersions(bundled, e.version) > 0);
 }
+
+/** The queue is done and a "when done" action will run after `seconds`. */
+export const onWhenDone = (cb: (c: WhenDoneCountdown) => void): Promise<UnlistenFn> =>
+  listen<WhenDoneCountdown>("dm://when-done", (e) => cb(e.payload));
+
+/** The "when done" choice changed (set, canceled, or reset after running). */
+export const onWhenDoneChanged = (cb: (a: WhenDone) => void): Promise<UnlistenFn> =>
+  listen<WhenDone>("dm://when-done-changed", (e) => cb(e.payload));
+
+/** The countdown stopped because a new download started. */
+export const onWhenDoneCanceled = (cb: () => void): Promise<UnlistenFn> => listen("dm://when-done-canceled", () => cb());
+
+/** Sleep / shut down could not be started. */
+export const onWhenDoneFailed = (cb: (error: string) => void): Promise<UnlistenFn> =>
+  listen<string>("dm://when-done-failed", (e) => cb(e.payload));
+
+/** A finished .zip was unpacked (or failed to). */
+export const onExtracted = (cb: (x: Extracted) => void): Promise<UnlistenFn> =>
+  listen<Extracted>("dm://extracted", (e) => cb(e.payload));
