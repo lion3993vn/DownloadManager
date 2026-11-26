@@ -8,6 +8,8 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-26
+
 ### ✨ New features
 - **Download on a schedule.** Pick a start time (and optionally a stop time) and the days of the week in *Settings → Automation*. At the start time, paused downloads (including "Add, start later" ones) resume; at the stop time everything pauses. Combine it with **When done → Shut down** for night-time downloads.
 - **Paste many links at once.** Paste a list of links (one per line) or a numbered pattern like `file[01-20].zip` or `photo[a-e].jpg`: the add dialog lists them all with checkboxes and adds one download each.
@@ -172,7 +174,8 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 - **Capture downloads from the browser** through a Manifest V3 extension, keeping cookies, referrer and user agent. If the app is not running, the browser downloads as usual.
 - Queue, global speed limit, runs in the background in the system tray.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.4
 [0.5.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.3
 [0.5.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.2
 [0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1

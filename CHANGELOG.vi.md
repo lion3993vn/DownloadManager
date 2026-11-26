@@ -8,6 +8,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-26
+
 ### ✨ Tính năng mới
 - **Tải theo lịch.** Chọn giờ bắt đầu (và giờ dừng nếu muốn) cùng các ngày trong tuần ở *Cài đặt → Tự động*. Đến giờ bắt đầu, các tệp đang tạm dừng (kể cả tệp "Thêm, tải sau") được tải tiếp; đến giờ dừng thì tạm dừng tất cả. Kết hợp với **Khi tải xong → Tắt máy** để tải qua đêm.
 - **Dán nhiều link một lần.** Dán danh sách link (mỗi dòng một link) hoặc mẫu đánh số như `file[01-20].zip`, `anh[a-e].jpg`: hộp thoại thêm link liệt kê tất cả kèm ô chọn, mỗi link là một lượt tải.
@@ -172,7 +174,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.4
 [0.5.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.3
 [0.5.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.2
 [0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1
