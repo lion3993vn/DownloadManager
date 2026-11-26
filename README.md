@@ -107,7 +107,7 @@ Updates are signed with minisign, and the app only installs a build whose signat
 
 ### Releasing
 
-1. While working, record changes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+1. While working, record changes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (English) and [CHANGELOG.vi.md](CHANGELOG.vi.md) (Vietnamese). The release description shows English first and Vietnamese below.
 2. Run `pnpm release 0.6.0` (`--dry-run` to preview). It bumps every version file, turns `[Unreleased]` into the version, commits, tags, pushes, and creates a draft release with your `gh` login.
 3. CI builds and signs Windows/macOS/Linux, attaches the installers, the extension and `latest.json`, writes the release notes and publishes. Running apps see the update within 6 hours.
 

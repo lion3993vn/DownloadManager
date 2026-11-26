@@ -8,8 +8,12 @@
   window.__dmVideoButton = true;
 
   const ext = globalThis.browser ?? globalThis.chrome;
-  // Content scripts do not load common.js (dmT); same lookup, inlined.
+  // Button texts in the app's language: the background sends them with each
+  // lookup ("media-best" -> ui). chrome.i18n (the browser's language) is only
+  // the fallback, since content scripts cannot load the app's language.
+  let uiText = {};
   const tr = (key) => {
+    if (uiText[key]) return uiText[key];
     try {
       return ext.i18n.getMessage(key) || key;
     } catch {
@@ -384,6 +388,7 @@
       if (current) hide();
       return;
     }
+    if (result.ui && typeof result.ui === "object") uiText = result.ui;
     if (!host) build();
     mount();
     // Same element, new target (or the same one found another way): update

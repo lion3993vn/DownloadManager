@@ -161,6 +161,8 @@ async fn ping(State(app): State<AppHandle>, headers: HeaderMap) -> Response {
         "paired": paired,
         // Lets the extension notice it is older than the one bundled with the app.
         "extensionVersion": crate::extension_setup::bundled_version(&app),
+        // The extension shows its text in the app's language, not the browser's.
+        "language": crate::i18n::code(),
     }))
     .into_response()
 }

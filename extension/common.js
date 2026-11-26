@@ -20,16 +20,84 @@ const DM_DEFAULTS = {
   skipNext: false,
 };
 
+// ---------- Language ----------
+// The extension speaks the app's language: the app reports it in /api/ping
+// and we keep it in storage.local.uiLanguage ("vi" | "en"). Its messages are
+// loaded from _locales/<lang>/messages.json, because chrome.i18n only follows
+// the browser's language. Before the app has ever answered, chrome.i18n is used.
+
+const DM_LANGS = ["vi", "en"];
+let dmLang = null; // language of dmLangTable
+let dmLangTable = null;
+
+/** Load the messages of `lang` (null: back to the browser's language). */
+async function dmLoadLanguage(lang) {
+  if (!DM_LANGS.includes(lang)) {
+    dmLang = null;
+    dmLangTable = null;
+    return;
+  }
+  if (lang === dmLang && dmLangTable) return;
+  try {
+    const res = await fetch(ext.runtime.getURL(`_locales/${lang}/messages.json`));
+    dmLangTable = await res.json();
+    dmLang = lang;
+  } catch {
+    dmLang = null;
+    dmLangTable = null;
+  }
+}
+
+/** Make dmT use the app's language (call before rendering text). */
+async function dmI18nReady() {
+  try {
+    const { uiLanguage } = await ext.storage.local.get("uiLanguage");
+    await dmLoadLanguage(uiLanguage);
+  } catch {
+    /* storage unavailable: keep the browser's language */
+  }
+}
+
+/** The language text is shown in. */
+function dmUiLanguage() {
+  if (dmLang) return dmLang;
+  try {
+    return ext.i18n.getUILanguage();
+  } catch {
+    return "en";
+  }
+}
+
 /**
- * Translated text from _locales/<browser language>/messages.json (English
- * otherwise). `subs` fill `$1`, `$2`… Falls back to the key.
+ * Translated text in the app's language (see above), else the browser's
+ * (_locales, English otherwise). `subs` fill `$1`, `$2`… Falls back to the key.
  */
 function dmT(key, ...subs) {
+  const m = dmLangTable && dmLangTable[key];
+  if (m) return m.message.replace(/\$(\d)/g, (_, i) => String(subs[i - 1] ?? ""));
   try {
     return ext.i18n.getMessage(key, subs.map(String)) || key;
   } catch {
     return key;
   }
+}
+
+let dmLastLangCheck = 0;
+/** Ask the app for its language at most every `minGapMs` (dmPing records it). */
+async function dmRefreshLanguage(minGapMs = 10000) {
+  if (Date.now() - dmLastLangCheck < minGapMs) return;
+  dmLastLangCheck = Date.now();
+  await dmPing(await dmSettings());
+}
+
+/** Remember the language the app reported; returns true if it changed. */
+async function dmSetAppLanguage(lang) {
+  if (!DM_LANGS.includes(lang)) return false;
+  const { uiLanguage } = await ext.storage.local.get("uiLanguage");
+  if (uiLanguage === lang) return false;
+  await ext.storage.local.set({ uiLanguage: lang });
+  await dmLoadLanguage(lang);
+  return true;
 }
 
 /**
@@ -38,7 +106,7 @@ function dmT(key, ...subs) {
  * `data-i18n-aria-label` elements under `root`.
  */
 function dmApplyI18n(root = document) {
-  if (root === document) document.documentElement.lang = ext.i18n.getUILanguage();
+  if (root === document) document.documentElement.lang = dmUiLanguage();
   for (const el of root.querySelectorAll("[data-i18n]")) el.textContent = dmT(el.dataset.i18n);
   for (const el of root.querySelectorAll("[data-i18n-html]")) el.innerHTML = dmT(el.dataset.i18nHtml);
   for (const el of root.querySelectorAll("[data-i18n-title]")) el.title = dmT(el.dataset.i18nTitle);
@@ -82,7 +150,10 @@ function dmHeaders(s, extra = {}) {
   };
 }
 
-/** -> { running: bool, paired: bool, extensionVersion: string | null } */
+/**
+ * -> { running: bool, paired: bool, extensionVersion: string | null }.
+ * Also adopts the app's language (storage.local.uiLanguage).
+ */
 async function dmPing(s) {
   try {
     const res = await fetch(`${dmBase(s)}/api/ping`, {
@@ -91,6 +162,7 @@ async function dmPing(s) {
     });
     if (!res.ok) return { running: false, paired: false, extensionVersion: null };
     const body = await res.json();
+    await dmSetAppLanguage(body.language).catch(() => {});
     return { running: true, paired: Boolean(body.paired), extensionVersion: body.extensionVersion || null };
   } catch {
     return { running: false, paired: false, extensionVersion: null };

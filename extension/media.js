@@ -554,8 +554,14 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     "media-best": async () => {
       const prefs = await dmSettings();
       if (!prefs.showVideoButton || !sender.tab) return null;
+      // Hovering is a good moment to notice a language change in the app.
+      await dmRefreshLanguage().catch(() => {});
       const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages, msg.direct);
-      return item ? { label: mediaLabel(item) } : null;
+      if (!item) return null;
+      // content.js has no access to the app's language: send its texts along.
+      const ui = {};
+      for (const k of ["videoButton", "sending", "sentToApp", "sendFailed", "openApp"]) ui[k] = dmT(k);
+      return { label: mediaLabel(item), ui };
     },
     "media-download-best": async () => {
       if (!sender.tab) return { ok: false };
@@ -566,7 +572,10 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   };
   const handler = msg && handlers[msg.type];
   if (!handler) return false;
-  handler().then(sendResponse, () => sendResponse(null));
+  // The worker may just have woken up: load the app's language first.
+  dmI18nReady()
+    .then(handler)
+    .then(sendResponse, () => sendResponse(null));
   return true;
 });
 

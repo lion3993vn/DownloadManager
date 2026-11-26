@@ -4,8 +4,8 @@ Mọi bản phát hành đi qua một lệnh: `pnpm release <x.y.z>`. Script nâ
 
 ```
 pnpm release 0.4.2
-  ├─ kiểm tra: đang ở main, không còn thay đổi chưa commit, version mới hơn, CHANGELOG có nội dung
-  ├─ nâng version ở 4 tệp + Cargo.lock, đổi [Unreleased] → [0.4.2]
+  ├─ kiểm tra: đang ở main, không còn thay đổi chưa commit, version mới hơn, cả 2 CHANGELOG có nội dung
+  ├─ nâng version ở 4 tệp + Cargo.lock, đổi [Unreleased] → [0.4.2] ở CHANGELOG.md + CHANGELOG.vi.md
   ├─ commit "release: v0.4.2", tag v0.4.2, push main + tag
   └─ gh release create v0.4.2 --draft        (tài khoản gh của bạn)
 
@@ -14,7 +14,7 @@ GitHub Actions (build.yml, chạy theo tag)
   ├─ bundle ×4     Windows x64, macOS arm64, macOS x64,      ~5 phút, song song
   │                Linux x64: build, ký, tải lên bản nháp
   ├─ extension     đóng gói extension/ thành .zip
-  └─ publish       đính kèm extension, viết mô tả (CHANGELOG + bảng tải về + SHA-256),
+  └─ publish       đính kèm extension, viết mô tả song ngữ (CHANGELOG + bảng tải về + SHA-256),
                    bỏ nháp, đánh dấu Latest
 ```
 
@@ -40,7 +40,11 @@ Version cũng là thứ duy nhất báo cho extension biết có bản mới. Ex
 
 ## Trước khi phát hành
 
-1. **Ghi CHANGELOG.** Viết các thay đổi dưới `## [Unreleased]` trong [CHANGELOG.md](../CHANGELOG.md), bằng tiếng Việt, cho người dùng đọc. Dùng các nhóm `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `### 🐛 Sửa lỗi`. Mục này trở thành mô tả release và hiện trong app ở *Nhật ký thay đổi*. Script từ chối chạy nếu mục này trống.
+1. **Ghi CHANGELOG, cả tiếng Anh và tiếng Việt.** Viết các thay đổi dưới `## [Unreleased]` ở **cả hai tệp**, cho người dùng đọc:
+   - [CHANGELOG.md](../CHANGELOG.md): tiếng Anh, bản chính. Nhóm `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fixes`.
+   - [CHANGELOG.vi.md](../CHANGELOG.vi.md): tiếng Việt, cùng nội dung. Nhóm `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `### 🐛 Sửa lỗi`.
+
+   Hai mục này ghép thành mô tả release (xem *Mô tả release* bên dưới) và hiện trong app ở *Nhật ký thay đổi*, theo ngôn ngữ giao diện. Script từ chối chạy nếu một trong hai mục trống.
 2. **Kiểm tra code.**
    ```bash
    cargo test --workspace
@@ -53,6 +57,25 @@ Version cũng là thứ duy nhất báo cho extension biết có bản mới. Ex
 3. **Commit hết, kể cả tệp mới.** Script chỉ kiểm tra tệp đã có trong git (`git status --untracked-files=no`). Tệp mới chưa `git add` sẽ bị bỏ lại mà không có cảnh báo, và bản phát hành sẽ build lỗi hoặc thiếu tính năng. Chạy `git status` và đảm bảo không còn dòng `??` nào cần thiết.
 4. **Đồng bộ với GitHub.** `git fetch && git status -sb` phải báo `## main...origin/main`, không `ahead` hay `behind`.
 5. **Chạy thử app** nếu có thay đổi giao diện: `pnpm tauri dev`. Thoát bản app đã cài trước, nếu không lệnh này chỉ đưa bản đó lên rồi thoát (xem `CLAUDE.md`).
+
+## Mô tả release
+
+Mô tả trên GitHub có tiếng Anh trước (mặc định), tiếng Việt bên dưới trong khối thu gọn *🇻🇳 Tiếng Việt*:
+
+```
+<!-- lang:en -->            ← CHANGELOG.md + bảng tải về, cập nhật, lưu ý (tiếng Anh)
+<!-- /lang -->
+<details><summary>🇻🇳 Tiếng Việt</summary>
+<!-- lang:vi -->            ← CHANGELOG.vi.md + cùng các phần đó bằng tiếng Việt
+<!-- /lang -->
+</details>
+### 🔑 SHA-256              ← dùng chung
+```
+
+- Các comment `<!-- lang:xx -->` không hiện trên GitHub. App dựa vào chúng để chỉ hiện phần đúng ngôn ngữ (`notesFor` trong `src/lib/format.ts`); đừng xóa hay đổi tên chúng trong `.github/release-template.md`.
+- `--changes-only` (bản nháp và ghi chú trong `latest.json`) có cùng cấu trúc, chỉ gồm phần thay đổi.
+- Xem trước mô tả đầy đủ: `node scripts/release-notes.mjs 0.4.2 --assets <thư mục có tên các tệp>` (tệp rỗng cũng được, chỉ SHA-256 là sai).
+- Bản phát hành trước v0.5.3 chỉ có tiếng Việt; app hiện nguyên văn.
 
 ## Phát hành
 
@@ -107,7 +130,7 @@ git tag -d v0.4.2                       # xóa tag ở máy
 # sửa lỗi, commit (commit "release: v0.4.2" cũ cứ để nguyên trong lịch sử)
 ```
 
-Để dùng lại số `0.4.2`: đổi version ở 4 tệp về bản trước (`git revert` commit release), đưa nội dung `## [0.4.2]` trong CHANGELOG về lại `## [Unreleased]`, rồi chạy `pnpm release 0.4.2`. Cách đơn giản hơn: phát hành luôn `0.4.3`.
+Để dùng lại số `0.4.2`: đổi version ở 4 tệp về bản trước (`git revert` commit release), đưa nội dung `## [0.4.2]` trong cả 2 CHANGELOG về lại `## [Unreleased]`, rồi chạy `pnpm release 0.4.2`. Cách đơn giản hơn: phát hành luôn `0.4.3`.
 
 **Bản đã publish có lỗi.** Không xóa release đã publish, vì người dùng có thể đã cập nhật. Sửa lỗi và phát hành bản vá tiếp theo; app tự cập nhật lên bản đó.
 
@@ -118,7 +141,7 @@ git tag -d v0.4.2                       # xóa tag ở máy
 | Tệp | Vai trò |
 |---|---|
 | `scripts/release.mjs` | `pnpm release`: kiểm tra, nâng version, commit, tag, push, tạo nháp |
-| `scripts/release-notes.mjs` | Tạo mô tả release từ CHANGELOG (`--changes-only`) hoặc mô tả đầy đủ (`--assets <dir>`) |
-| `.github/release-template.md` | Mẫu mô tả: bảng tải về, hướng dẫn cập nhật, lưu ý |
+| `scripts/release-notes.mjs` | Tạo mô tả release song ngữ từ CHANGELOG.md + CHANGELOG.vi.md (`--changes-only`) hoặc mô tả đầy đủ (`--assets <dir>`) |
+| `.github/release-template.md` | Mẫu mô tả song ngữ: bảng tải về, hướng dẫn cập nhật, lưu ý (khối `lang:en`, `lang:vi`) |
 | `.github/workflows/build.yml` | test → bundle ×4 → extension → publish |
 | `.github/workflows/warm-cache.yml` | Build sẵn các thư viện trên `main`, để lần build theo tag nhanh hơn |

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, compareVersions, type ReleaseInfo } from "../lib/api";
-import { formatBytes } from "../lib/format";
+import { formatBytes, notesFor } from "../lib/format";
 import type { Updater } from "../lib/useUpdater";
 import { Modal } from "./Modal";
-import { locale, useT } from "../i18n";
+import { locale, useLang, useT } from "../i18n";
 import { AlertIcon, CheckCircleIcon, OpenIcon, RefreshIcon, SparklesIcon } from "./Icons";
 
 interface Props {
@@ -23,6 +23,7 @@ function formatDay(iso: string | null): string {
 /** Release notes as Markdown; links open in the system browser. */
 export function Notes({ text }: { text: string }) {
   const t = useT();
+  const lang = useLang();
   return (
     <div className="md">
       <Markdown
@@ -41,7 +42,7 @@ export function Notes({ text }: { text: string }) {
           ),
         }}
       >
-        {text || t("changelog.noNotes")}
+        {notesFor(text, lang) || t("changelog.noNotes")}
       </Markdown>
     </div>
   );

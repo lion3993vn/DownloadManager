@@ -20,6 +20,15 @@ pub fn english() -> bool {
     ENGLISH.load(Ordering::Relaxed)
 }
 
+/// The current language as a code: `"en"` or `"vi"`.
+pub fn code() -> &'static str {
+    if english() {
+        "en"
+    } else {
+        "vi"
+    }
+}
+
 fn system_is_vietnamese() -> bool {
     sys_locale::get_locale().is_some_and(|l| l.to_ascii_lowercase().starts_with("vi"))
 }

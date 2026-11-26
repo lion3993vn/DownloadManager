@@ -104,9 +104,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The CHANGELOG section becomes the release body and the notes inside
+      # The CHANGELOG sections (CHANGELOG.md English + CHANGELOG.vi.md) become the release body and the notes inside
       # latest.json (shown by the in-app updater).
-      - name: Release notes from CHANGELOG.md
+      - name: Release notes from CHANGELOG.md + CHANGELOG.vi.md
         id: notes
         if: github.ref_type == 'tag'
         shell: bash

@@ -1,7 +1,5 @@
 const $ = (id) => document.getElementById(id);
 
-dmApplyI18n();
-
 // Every change is saved right away; a toast confirms it.
 
 /** File types shown as groups. Anything else the user adds goes under "other". */
@@ -281,9 +279,9 @@ $("pair").addEventListener("click", async () => {
 
 $("reset").addEventListener("click", async () => {
   if (!confirm(dmT("resetConfirm"))) return;
-  const { token, port } = await dmSettings();
+  const { token, port, uiLanguage } = await dmSettings();
   await ext.storage.local.clear();
-  await save({ token, port });
+  await save({ token, port, ...(uiLanguage ? { uiLanguage } : {}) });
   load();
 });
 
@@ -303,7 +301,23 @@ async function load() {
 
 $("version").textContent = "v" + ext.runtime.getManifest().version;
 
-load().finally(() => {
-  void document.body.offsetWidth; // flush styles so the initial toggle state is not animated
-  document.body.classList.add("ready");
+// The language the page was drawn in. When the app switches language while
+// this page is open (dmPing in checkStatus() stores it), redraw everything.
+let shownLang = null;
+ext.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.uiLanguage) return;
+  const next = changes.uiLanguage.newValue; // undefined: storage cleared, not a switch
+  if (shownLang && next && next !== shownLang) location.reload();
 });
+
+// Texts follow the app's language: load it before drawing anything.
+dmI18nReady()
+  .then(() => {
+    shownLang = dmUiLanguage();
+    dmApplyI18n();
+    return load();
+  })
+  .finally(() => {
+    void document.body.offsetWidth; // flush styles so the initial toggle state is not animated
+    document.body.classList.add("ready");
+  });

@@ -153,3 +153,16 @@ export function errorText(message: string | null | undefined): string {
   if (yt) return t("error.video", { msg: yt[1] });
   return message;
 }
+
+/**
+ * Release notes hold one block per language, `<!-- lang:en -->…<!-- /lang -->`
+ * (scripts/release-notes.mjs, from v0.5.3). Returns the block for `lang`,
+ * else the English one, else the whole text (older, Vietnamese-only notes).
+ */
+export function notesFor(text: string, lang: string): string {
+  const blocks = new Map<string, string>();
+  for (const m of text.matchAll(/<!--\s*lang:(\w+)\s*-->([\s\S]*?)<!--\s*\/lang\s*-->/g)) {
+    blocks.set(m[1], m[2].trim());
+  }
+  return blocks.get(lang) ?? blocks.get("en") ?? text;
+}

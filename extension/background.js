@@ -227,7 +227,8 @@ if (ext.downloads.onDeterminingFilename) {
   });
 }
 
-function createMenu() {
+async function createMenu() {
+  await dmI18nReady(); // the title is in the app's language
   ext.contextMenus.removeAll(() => {
     ext.contextMenus.create({
       id: MENU_ID,
@@ -255,13 +256,23 @@ ext.tabs.onUpdated.addListener((_tabId, info) => {
 ext.runtime.onInstalled.addListener(onBoot);
 ext.runtime.onStartup?.addListener(onBoot);
 
+// The app's language changed (dmPing stored it): retitle the context menu.
+ext.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.uiLanguage) {
+    dmLoadLanguage(changes.uiLanguage.newValue).then(createMenu, () => {});
+  }
+});
+
 // Also check on a timer, so a new version is picked up within about 30 s of
 // the app refreshing the folder, without a page load or a manual reload.
 // (Browsers may round the period up; Chrome's minimum is 30 s.)
 const SELF_UPDATE_ALARM = "dm-self-update";
 if (ext.alarms) {
   ext.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === SELF_UPDATE_ALARM) dmSelfUpdate().catch(() => {});
+    if (alarm.name !== SELF_UPDATE_ALARM) return;
+    dmSelfUpdate().catch(() => {});
+    // Also follow the app's language (switched in its Settings).
+    dmRefreshLanguage(0).catch(() => {});
   });
   Promise.resolve(ext.alarms.get(SELF_UPDATE_ALARM))
     .then((a) => a || ext.alarms.create(SELF_UPDATE_ALARM, { periodInMinutes: 0.5 }))
@@ -303,6 +314,7 @@ ext.contextMenus.onClicked.addListener(async (info, tab) => {
 ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== "pair") return false;
   (async () => {
+    await dmI18nReady();
     const s = await dmSettings();
     try {
       const res = await fetch(`${dmBase(s)}/api/pair`, {

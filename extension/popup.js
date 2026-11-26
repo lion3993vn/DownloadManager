@@ -1,8 +1,12 @@
 const $ = (id) => document.getElementById(id);
 
-dmApplyI18n();
-// Badge text of the "skip next" row (CSS `content: attr(data-on-label)`).
-document.querySelector("#skip-row .title").dataset.onLabel = dmT("skipActive");
+/** Static texts, in the app's language (dmI18nReady must have run). */
+function applyTexts() {
+  dmApplyI18n();
+  // Badge text of the "skip next" row (CSS `content: attr(data-on-label)`).
+  document.querySelector("#skip-row .title").dataset.onLabel = dmT("skipActive");
+  $("subtitle").textContent = dmT("popupSubtitleVersion", VERSION);
+}
 
 /**
  * Header chip (short `chip` text) always; the notice card only when something
@@ -25,7 +29,6 @@ function renderSkip(on) {
 }
 
 const VERSION = ext.runtime.getManifest().version;
-$("subtitle").textContent = dmT("popupSubtitleVersion", VERSION);
 
 function showUpdate(state, title, desc) {
   $("update").hidden = false;
@@ -213,19 +216,37 @@ async function download(item) {
   refreshMedia();
 }
 
-ext.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-  tabId = tab ? tab.id : null;
-  refreshMedia();
-  // Playlist details (quality, duration) arrive a moment after detection.
-  setInterval(refreshMedia, 1500);
-});
+function startMedia() {
+  ext.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    tabId = tab ? tab.id : null;
+    refreshMedia();
+    // Playlist details (quality, duration) arrive a moment after detection.
+    setInterval(refreshMedia, 1500);
+  });
+}
 
 $("options").addEventListener("click", () => {
   ext.runtime.openOptionsPage();
   window.close();
 });
 
-refresh().finally(() => {
-  void document.body.offsetWidth; // flush styles so the initial toggle state is not animated
-  document.body.classList.add("ready");
+// The language the texts were drawn in. When the app switches language while
+// the popup is open (dmPing in refresh() stores it), redraw everything.
+let shownLang = null;
+ext.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.uiLanguage) return;
+  const next = changes.uiLanguage.newValue; // undefined: storage cleared, not a switch
+  if (shownLang && next && next !== shownLang) location.reload();
 });
+
+dmI18nReady()
+  .then(() => {
+    shownLang = dmUiLanguage();
+    applyTexts();
+    startMedia();
+    return refresh();
+  })
+  .finally(() => {
+    void document.body.offsetWidth; // flush styles so the initial toggle state is not animated
+    document.body.classList.add("ready");
+  });

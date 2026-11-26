@@ -1,8 +1,14 @@
-// Builds the GitHub release description for a version.
+// Builds the GitHub release description for a version, in English (first,
+// the default) and Vietnamese (below, collapsed).
 //
-//   node scripts/release-notes.mjs 0.4.0 --changes-only      # CHANGELOG section only
+//   node scripts/release-notes.mjs 0.4.0 --changes-only      # CHANGELOG sections only
 //   node scripts/release-notes.mjs 0.4.0 --assets <dir>       # full notes from the template,
 //                                                             # download table + SHA-256 from <dir>
+//
+// English comes from CHANGELOG.md, Vietnamese from CHANGELOG.vi.md. Each
+// language sits between `<!-- lang:en -->` / `<!-- lang:vi -->` and
+// `<!-- /lang -->` (invisible on GitHub); the app's changelog shows only the
+// block for its UI language (notesFor in src/lib/format.ts).
 //
 // Prints Markdown to stdout. No dependencies (Node >= 20).
 import { execFileSync } from "node:child_process";
@@ -31,14 +37,34 @@ function changelogSection(text, v) {
 }
 
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-const changes = changelogSection(changelog, version);
-if (!changes) {
-  console.error(`CHANGELOG.md has no non-empty section for [${version}]`);
-  process.exit(1);
+const changesEn = changelogSection(changelog, version);
+const changesVi = changelogSection(readFileSync(join(root, "CHANGELOG.vi.md"), "utf8"), version);
+for (const [file, text] of [
+  ["CHANGELOG.md", changesEn],
+  ["CHANGELOG.vi.md", changesVi],
+]) {
+  if (!text) {
+    console.error(`${file} has no non-empty section for [${version}]`);
+    process.exit(1);
+  }
 }
 
 if (args.includes("--changes-only")) {
-  process.stdout.write(changes + "\n");
+  const notes = [
+    "<!-- lang:en -->",
+    changesEn,
+    "<!-- /lang -->",
+    "",
+    "<details>",
+    "<summary><b>🇻🇳 Tiếng Việt</b></summary>",
+    "",
+    "<!-- lang:vi -->",
+    changesVi,
+    "<!-- /lang -->",
+    "",
+    "</details>",
+  ];
+  process.stdout.write(notes.join("\n") + "\n");
   process.exit(0);
 }
 
@@ -48,25 +74,29 @@ if (!args.includes("--assets") || !assetsDir) {
   process.exit(2);
 }
 
-// Files users actually download, in display order.
+// Files users actually download, in display order: [pattern, English, Vietnamese].
 const KINDS = [
-  [/_x64-setup\.exe$/, "**Windows 10/11** (khuyên dùng)"],
-  [/_x64.*\.msi$/, "Windows (MSI)"],
-  [/_arm64-setup\.exe$/, "Windows ARM64"],
-  [/_aarch64\.dmg$/, "**macOS** (Apple Silicon M1–M4)"],
-  [/_x64\.dmg$/, "macOS (Intel)"],
-  [/_universal\.dmg$/, "**macOS** (Intel + Apple Silicon)"],
-  [/_amd64\.deb$/, "**Linux** (Debian/Ubuntu)"],
-  [/\.AppImage$/, "Linux (mọi distro)"],
-  [/\.rpm$/, "Linux (Fedora/openSUSE)"],
-  [/extension-.*\.zip$/, "Extension (cài thủ công)"],
+  [/_x64-setup\.exe$/, "**Windows 10/11** (recommended)", "**Windows 10/11** (khuyên dùng)"],
+  [/_x64.*\.msi$/, "Windows (MSI)", "Windows (MSI)"],
+  [/_arm64-setup\.exe$/, "Windows ARM64", "Windows ARM64"],
+  [/_aarch64\.dmg$/, "**macOS** (Apple Silicon M1–M4)", "**macOS** (Apple Silicon M1–M4)"],
+  [/_x64\.dmg$/, "macOS (Intel)", "macOS (Intel)"],
+  [/_universal\.dmg$/, "**macOS** (Intel + Apple Silicon)", "**macOS** (Intel + Apple Silicon)"],
+  [/_amd64\.deb$/, "**Linux** (Debian/Ubuntu)", "**Linux** (Debian/Ubuntu)"],
+  [/\.AppImage$/, "Linux (any distro)", "Linux (mọi distro)"],
+  [/\.rpm$/, "Linux (Fedora/openSUSE)", "Linux (Fedora/openSUSE)"],
+  [/extension-.*\.zip$/, "Extension (manual install)", "Extension (cài thủ công)"],
 ];
 const files = readdirSync(assetsDir)
   .filter((f) => statSync(join(assetsDir, f)).isFile())
   .sort();
-const downloads = KINDS.flatMap(([re, label]) =>
-  files.filter((f) => re.test(f)).map((f) => `| ${label} | [\`${f}\`](https://github.com/${REPO}/releases/download/v${version}/${encodeURIComponent(f)}) |`),
-);
+/** Download table rows; `col` 1 = English labels, 2 = Vietnamese. */
+const downloads = (col) =>
+  KINDS.flatMap((kind) =>
+    files
+      .filter((f) => kind[0].test(f))
+      .map((f) => `| ${kind[col]} | [\`${f}\`](https://github.com/${REPO}/releases/download/v${version}/${encodeURIComponent(f)}) |`),
+  ).join("\n") || "| — | — |";
 const checksums = files
   .filter((f) => !f.endsWith(".sig") && f !== "latest.json")
   .map((f) => `${createHash("sha256").update(readFileSync(join(assetsDir, f))).digest("hex")}  ${f}`);
@@ -83,15 +113,17 @@ const tagExists = (tag) => {
 };
 const compare =
   prev && tagExists(`v${prev}`)
-    ? ` · [So sánh v${prev}...v${version}](https://github.com/${REPO}/compare/v${prev}...v${version})`
+    ? ` · [Compare v${prev}...v${version}](https://github.com/${REPO}/compare/v${prev}...v${version})`
     : "";
 
 const template = readFileSync(join(root, ".github", "release-template.md"), "utf8");
 const body = template
   .replaceAll("{{VERSION}}", version)
   .replaceAll("{{REPO}}", REPO)
-  .replace("{{CHANGES}}", changes)
-  .replace("{{DOWNLOADS}}", downloads.join("\n") || "| — | — |")
+  .replace("{{CHANGES_EN}}", changesEn)
+  .replace("{{CHANGES_VI}}", changesVi)
+  .replace("{{DOWNLOADS_EN}}", downloads(1))
+  .replace("{{DOWNLOADS_VI}}", downloads(2))
   .replace("{{CHECKSUMS}}", checksums.join("\n"))
   .replace("{{COMPARE}}", compare);
 process.stdout.write(body);
