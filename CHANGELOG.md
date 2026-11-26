@@ -8,6 +8,8 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-26
+
 ### ✨ New features
 - **Catch copied links.** Copy a link to a file (zip, exe, mp4, pdf…) anywhere and the app asks whether to download it. Video page links (YouTube, TikTok…) can be included too. *Settings → Automation*.
 - **Sort files into folders by type.** Videos, music, archives, documents, programs and images go to their own folders inside the download folder (names or full paths can be changed). Off by default; turn it on in *Settings → Automation*.
@@ -162,7 +164,8 @@ Groups to use: `### ✨ New features`, `### 🔧 Improvements`, `### 🐛 Bug fi
 - **Capture downloads from the browser** through a Manifest V3 extension, keeping cookies, referrer and user agent. If the app is not running, the browser downloads as usual.
 - Queue, global speed limit, runs in the background in the system tray.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.3
 [0.5.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.2
 [0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1
 [0.5.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.0

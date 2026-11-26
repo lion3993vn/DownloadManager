@@ -8,6 +8,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-26
+
 ### ✨ Tính năng mới
 - **Bắt link khi sao chép.** Sao chép link tới một tệp (zip, exe, mp4, pdf…) ở bất kỳ đâu là app hỏi có tải không. Có thể bật cả link trang video (YouTube, TikTok…). *Cài đặt → Tự động*.
 - **Tự xếp tệp vào thư mục theo loại.** Video, nhạc, tệp nén, tài liệu, chương trình và ảnh được lưu vào thư mục riêng trong thư mục tải về (đổi được tên hoặc đường dẫn). Mặc định tắt; bật trong *Cài đặt → Tự động*.
@@ -162,7 +164,8 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 - **Bắt lượt tải từ trình duyệt** qua extension Manifest V3, giữ cookie, referrer và user-agent. Nếu app không chạy, trình duyệt vẫn tải như bình thường.
 - Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
 
-[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/lion3993vn/DownloadManager/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.3
 [0.5.2]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.2
 [0.5.1]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.1
 [0.5.0]: https://github.com/lion3993vn/DownloadManager/releases/tag/v0.5.0
