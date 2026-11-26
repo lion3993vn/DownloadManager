@@ -1,0 +1,260 @@
+{
+  "extName": {
+    "message": "DownloadManager Connector",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Hands browser downloads to DownloadManager for faster multi-connection downloading.",
+    "description": "Extension description"
+  },
+  "popupSubtitle": {
+    "message": "Faster multi-connection downloads"
+  },
+  "popupSubtitleVersion": {
+    "message": "Multi-connection downloads · v$1",
+    "description": "$1 = extension version"
+  },
+  "options": {
+    "message": "Options"
+  },
+  "statusChecking": {
+    "message": "Checking…"
+  },
+  "statusCheckingDesc": {
+    "message": "Looking for the DownloadManager app on this computer."
+  },
+  "pairButton": {
+    "message": "Connect to the app"
+  },
+  "mediaHeading": {
+    "message": "Videos on this page"
+  },
+  "mediaEmpty": {
+    "message": "No videos found yet. Play a video on the page, then open this again."
+  },
+  "captureTitle": {
+    "message": "Capture downloads"
+  },
+  "captureDesc": {
+    "message": "Send matching files to the app"
+  },
+  "skipTitle": {
+    "message": "Skip the next download"
+  },
+  "skipDesc": {
+    "message": "Let the browser handle it, just once"
+  },
+  "skipActive": {
+    "message": "On"
+  },
+  "popupTip": {
+    "message": "Tip: right-click a link to send it to the app"
+  },
+  "updating": {
+    "message": "Updating to v$1…",
+    "description": "$1 = new version"
+  },
+  "updatingDesc": {
+    "message": "The extension will restart in a moment."
+  },
+  "outdatedTitle": {
+    "message": "Extension is outdated (v$1)",
+    "description": "$1 = installed version"
+  },
+  "outdatedDesc": {
+    "message": "The app ships v$1. Open DownloadManager → Connect browser to reinstall it.",
+    "description": "$1 = version shipped with the app"
+  },
+  "appNotRunning": {
+    "message": "The app is not running"
+  },
+  "appNotRunningDesc": {
+    "message": "The browser will download files as usual."
+  },
+  "notPaired": {
+    "message": "Not paired"
+  },
+  "notPairedDesc": {
+    "message": "The app is running. Click the button below to connect."
+  },
+  "connected": {
+    "message": "Connected"
+  },
+  "connectedDesc": {
+    "message": "Matching downloads will be sent to the app."
+  },
+  "pairWaiting": {
+    "message": "Waiting for approval…"
+  },
+  "pairWaitingDesc": {
+    "message": "Click “Allow” in the DownloadManager window."
+  },
+  "pairFailed": {
+    "message": "Pairing failed"
+  },
+  "tryAgain": {
+    "message": "Please try again."
+  },
+  "mediaPageTitle": {
+    "message": "Video on $1",
+    "description": "$1 = site name"
+  },
+  "mediaHlsTitle": {
+    "message": "HLS video"
+  },
+  "mediaPageHint": {
+    "message": "Choose a quality or MP3 in the app"
+  },
+  "btnSent": {
+    "message": "✓ Sent"
+  },
+  "btnRetry": {
+    "message": "Retry"
+  },
+  "btnDownload": {
+    "message": "Download"
+  },
+  "sendVideoFailed": {
+    "message": "Could not send the video"
+  },
+  "optionsTitle": {
+    "message": "DownloadManager — Options"
+  },
+  "optionsIntro": {
+    "message": "Send browser downloads to the app for multi-connection downloading."
+  },
+  "connectionHeading": {
+    "message": "Connection"
+  },
+  "pairAuto": {
+    "message": "Pair automatically"
+  },
+  "tokenLabel": {
+    "message": "Pairing code"
+  },
+  "tokenPlaceholder": {
+    "message": "Paste the code from the app"
+  },
+  "showToken": {
+    "message": "Show code"
+  },
+  "hideToken": {
+    "message": "Hide code"
+  },
+  "tokenHelp": {
+    "message": "DownloadManager → Settings → Browser. Usually filled in automatically."
+  },
+  "portLabel": {
+    "message": "Port"
+  },
+  "captureHeading": {
+    "message": "Download capture"
+  },
+  "enabledTitle": {
+    "message": "Send downloads to the app automatically"
+  },
+  "enabledDesc": {
+    "message": "When off, the browser handles every download."
+  },
+  "extLabel": {
+    "message": "File extensions to capture"
+  },
+  "extPlaceholder": {
+    "message": "Add an extension, e.g. torrent"
+  },
+  "extHelp": {
+    "message": "Press <kbd>Enter</kbd> or Space to add, <kbd>Backspace</kbd> to remove.",
+    "description": "HTML"
+  },
+  "removeExt": {
+    "message": "Remove .$1",
+    "description": "$1 = file extension"
+  },
+  "minSizeLabel": {
+    "message": "Also capture any file larger than"
+  },
+  "minSizeHelp": {
+    "message": "Set to 0 to turn off."
+  },
+  "videoButtonTitle": {
+    "message": "Show the “Download video” button on pages"
+  },
+  "videoButtonDesc": {
+    "message": "Hover over a video to send it to the app. Works with video files and HLS streams (.m3u8). Videos found are always listed in the extension popup."
+  },
+  "optionsTip": {
+    "message": "Right-click a link → <b>Download with DownloadManager</b> to send any file. If the app is not running, the browser downloads as usual.",
+    "description": "HTML"
+  },
+  "reset": {
+    "message": "Restore defaults"
+  },
+  "dirty": {
+    "message": "Unsaved changes"
+  },
+  "saved": {
+    "message": "Saved"
+  },
+  "saveChanges": {
+    "message": "Save changes"
+  },
+  "optNotRunning": {
+    "message": "The app is not running"
+  },
+  "optNotRunningDesc": {
+    "message": "Open DownloadManager, then reload this page."
+  },
+  "tokenWrong": {
+    "message": "Wrong pairing code"
+  },
+  "tokenWrongDesc": {
+    "message": "Click “Pair automatically” or paste the code from the app."
+  },
+  "optConnectedDesc": {
+    "message": "The extension is working with DownloadManager."
+  },
+  "resetConfirm": {
+    "message": "Restore the capture settings to their defaults? The pairing code is kept."
+  },
+  "menuDownload": {
+    "message": "Download with DownloadManager",
+    "description": "Context menu"
+  },
+  "errAppUnreachable": {
+    "message": "Could not reach the app. Open DownloadManager."
+  },
+  "problemLive": {
+    "message": "Live stream"
+  },
+  "problemSplitAudio": {
+    "message": "Separate audio track"
+  },
+  "errNotConnected": {
+    "message": "Not connected to the app"
+  },
+  "errAppRejected": {
+    "message": "The app did not accept it (open DownloadManager)"
+  },
+  "errVideoGone": {
+    "message": "This video is no longer on the page"
+  },
+  "errNoStream": {
+    "message": "No downloadable stream found"
+  },
+  "videoButton": {
+    "message": "Download video",
+    "description": "Button shown over videos"
+  },
+  "sending": {
+    "message": "Sending…"
+  },
+  "sentToApp": {
+    "message": "Sent to the app"
+  },
+  "sendFailed": {
+    "message": "Could not send"
+  },
+  "openApp": {
+    "message": "Open DownloadManager"
+  }
+}

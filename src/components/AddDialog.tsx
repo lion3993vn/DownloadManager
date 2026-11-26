@@ -6,6 +6,7 @@ import { Field, Modal } from "./Modal";
 import { FileTile } from "./FileTile";
 import { AlertIcon, BoltIcon, FolderIcon, LinkIcon, PlusIcon, PuzzleIcon } from "./Icons";
 import { ToolsInstallCard } from "./MediaTools";
+import { useT, type TFunction } from "../i18n";
 
 interface Props {
   /** Prefilled from a browser capture. */
@@ -35,7 +36,15 @@ const SITE_NAMES: Record<string, string> = { Youtube: "YouTube", YoutubeTab: "Yo
 const MEDIA_EXT = /\.(mp4|m4v|mkv|webm|mov|mp3|m4a|opus|ogg)$/i;
 const withExt = (name: string, ext: string) => (name ? `${name.replace(MEDIA_EXT, "")}.${ext}` : name);
 
+/** The engine's quality labels are English words for "best" and M4A audio; heights and "MP3" pass through. */
+function qualityLabel(t: TFunction, q: { id: string; label: string }): string {
+  if (q.id === "best") return t("add.qualityBest");
+  if (q.id === "audio" && q.label !== "MP3") return t("add.qualityM4a");
+  return q.label;
+}
+
 export function AddDialog({ capture, defaultDir, defaultConnections, onClose, onAdded, onError }: Props) {
+  const t = useT();
   const [url, setUrl] = useState(capture?.url ?? "");
   const [fileName, setFileName] = useState(capture?.fileName ?? "");
   const [nameTouched, setNameTouched] = useState(Boolean(capture?.fileName));
@@ -61,7 +70,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
     }
     setProbe({ kind: "loading" });
     let stale = false;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       api
         .probe(target, headers)
         .then((result) => {
@@ -77,7 +86,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
     }, 350);
     return () => {
       stale = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, probeNonce]);
@@ -132,21 +141,21 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
 
   return (
     <Modal
-      title={capture ? (capture.kind === "media" ? "Tải video từ trình duyệt" : "Bắt được tệp từ trình duyệt") : "Thêm liên kết tải"}
-      subtitle={capture ? `Từ ${hostOf(capture.referrer || capture.url)}` : "Dán liên kết tệp hoặc trang video (YouTube, TikTok…)"}
+      title={capture ? (capture.kind === "media" ? t("add.titleCaptureMedia") : t("add.titleCapture")) : t("add.title")}
+      subtitle={capture ? t("add.from", { host: hostOf(capture.referrer || capture.url) }) : t("add.subtitle")}
       icon={capture ? <PuzzleIcon /> : <LinkIcon />}
       onClose={onClose}
       width="max-w-[560px]"
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Hủy
+            {t("common.cancel")}
           </button>
           <button className="btn-outline" disabled={!valid || busy || blocked} onClick={() => submit(true)}>
-            <PlusIcon /> Thêm, tải sau
+            <PlusIcon /> {t("add.addLater")}
           </button>
           <button className="btn-primary min-w-[110px]" disabled={!valid || busy || blocked} onClick={() => submit(false)}>
-            <BoltIcon /> Tải ngay
+            <BoltIcon /> {t("add.downloadNow")}
           </button>
         </>
       }
@@ -182,7 +191,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
               <input
                 className="w-full truncate bg-transparent text-[14px] font-medium text-ink outline-none placeholder:text-faint"
                 value={fileName}
-                placeholder="Tên tệp (tự động)"
+                placeholder={t("add.fileNamePlaceholder")}
                 onChange={(e) => {
                   setFileName(e.target.value);
                   setNameTouched(true);
@@ -192,7 +201,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                 {probe.kind === "loading" && (
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />{" "}
-                    {videoSite ? "Đang lấy thông tin video…" : "Đang kiểm tra…"}
+                    {videoSite ? t("add.loadingVideo") : t("add.checking")}
                   </span>
                 )}
                 {probe.kind === "error" && !toolsMissing && (
@@ -200,9 +209,9 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                     <AlertIcon /> {errorText(probe.message)}
                   </span>
                 )}
-                {toolsMissing && <span className="text-mute">Video · cần cài công cụ tải video</span>}
+                {toolsMissing && <span className="text-mute">{t("add.toolsNeeded")}</span>}
                 {(probe.kind === "ok" || size != null) && (
-                  <span className="font-medium text-ink-2" title={stream || media ? "Ước tính" : undefined}>
+                  <span className="font-medium text-ink-2" title={stream || media ? t("add.estimate") : undefined}>
                     {(stream || media) && size != null ? "≈ " : ""}
                     {formatBytes(size)}
                   </span>
@@ -216,7 +225,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                     {media.uploader && <span className="truncate">{media.uploader}</span>}
                     {media.isLive && (
                       <span className="flex items-center gap-1.5 text-red-500">
-                        <AlertIcon /> Đang phát trực tiếp, không tải được
+                        <AlertIcon /> {t("add.liveVideo")}
                       </span>
                     )}
                   </>
@@ -230,11 +239,12 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                     </span>
                     {stream.live ? (
                       <span className="flex items-center gap-1.5 text-red-500">
-                        <AlertIcon /> Luồng phát trực tiếp, không tải được
+                        <AlertIcon /> {t("add.liveStream")}
                       </span>
                     ) : (
                       <span className="rounded-full bg-emerald-500/12 px-2 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                        {stream.segments} đoạn · tạm dừng được{stream.encrypted ? " · đã mã hóa" : ""}
+                        {t("add.hlsSegments", { n: stream.segments })}
+                        {stream.encrypted ? t("add.encrypted") : ""}
                       </span>
                     )}
                   </>
@@ -244,11 +254,11 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                   !media &&
                   (probe.result.resumable ? (
                     <span className="rounded-full bg-emerald-500/12 px-2 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                      Đa luồng · tạm dừng được
+                      {t("add.multiConn")}
                     </span>
                   ) : (
                     <span className="rounded-full bg-amber-500/14 px-2 py-px text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                      Máy chủ chỉ cho tải 1 luồng
+                      {t("add.singleConn")}
                     </span>
                   ))}
               </div>
@@ -259,7 +269,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
         {toolsMissing && <ToolsInstallCard onInstalled={() => setProbeNonce((n) => n + 1)} onError={onError} />}
 
         {media && !media.isLive && media.qualities.length > 0 && (
-          <Field label="Chất lượng" hint={media.needsFfmpegForBest ? "Cài ffmpeg (Cài đặt → Video) để tải chất lượng cao hơn." : undefined}>
+          <Field label={t("add.quality")} hint={media.needsFfmpegForBest ? t("add.qualityHint") : undefined}>
             <div className="flex flex-wrap gap-1.5">
               {media.qualities.map((q) => (
                 <button
@@ -272,7 +282,7 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
                   }`}
                 >
                   <span className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${quality === q.id ? "text-brand" : "text-ink"}`}>
-                    {q.label}
+                    {qualityLabel(t, q)}
                   </span>
                   <span className="text-[11px] text-mute tabular-nums">{q.estimatedSize ? `≈ ${formatBytes(q.estimatedSize)}` : "—"}</span>
                 </button>
@@ -281,22 +291,22 @@ export function AddDialog({ capture, defaultDir, defaultConnections, onClose, on
           </Field>
         )}
 
-        <Field label="Lưu vào">
+        <Field label={t("add.saveTo")}>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <FolderIcon className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
               <input className="field pl-10" value={saveDir} onChange={(e) => setSaveDir(e.target.value)} />
             </div>
             <button type="button" className="btn-outline" onClick={pickFolder}>
-              Chọn…
+              {t("add.browse")}
             </button>
           </div>
         </Field>
 
         {!media && !toolsMissing && (
           <Field
-            label="Số kết nối song song"
-            hint="Nhiều kết nối thường nhanh hơn. Nếu máy chủ giới hạn, app sẽ tự giảm."
+            label={t("add.connections")}
+            hint={t("add.connectionsHint")}
           >
             <div className="flex gap-1 rounded-lg bg-panel p-1">
               {CONNECTION_CHOICES.map((c) => (

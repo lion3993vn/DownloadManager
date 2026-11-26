@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A cross-platform download manager: a Rust engine that downloads one file over many parallel HTTP Range connections, a Tauri 2 desktop app (React UI), and an MV3 browser extension that hands browser downloads to the app. The UI, installer and extension text are in **Vietnamese**; keep new user-facing strings in Vietnamese.
+A cross-platform download manager: a Rust engine that downloads one file over many parallel HTTP Range connections, a Tauri 2 desktop app (React UI), and an MV3 browser extension that hands browser downloads to the app. The UI, tray, installer and extension are in **Vietnamese and English**. Every new user-facing string needs both (see "Translations" below); Vietnamese is the source language. CHANGELOG.md and release notes stay in Vietnamese.
 
 ## Commands
 
@@ -127,6 +127,13 @@ Cargo workspace members: `crates/dm-core` (engine, no Tauri dependency), `crates
 - The sidebar collapses to a 60px icon rail (Ctrl+B, saved in `localStorage` `dm.sidebarCollapsed`).
 - `view` switches between the download list and `StatsPage`. Stats are computed client-side from the current download list, so removed downloads are not counted.
 - Charts (`components/charts.tsx`) are hand-written SVG that follows the dataviz specs. The `--chart` / `--chart-hover` colors in `index.css` were validated against the card surface in both themes.
+
+### Translations
+- UI: `src/i18n/`. Messages are in `messages/<namespace>.ts` with `vi` and `en` side by side in `defineMessages`, which makes TypeScript reject a missing English key. Keys carry the namespace prefix (`settings.title`); shared words (`common.*`, `status.*`, `time.*`, `error.*`) are in `core.ts`. Components call `const t = useT()` (re-renders on a language change); plain helpers such as `lib/format.ts` import `t`. Do not put translated text in module-level constants: keep keys and translate at render. English plurals use `plural()`. Dates use `locale()`.
+- The preference is `AppSettings.language` (`"auto"` | `"vi"` | `"en"`), mirrored in localStorage `dm.language` for the first paint. App applies it with `setLanguagePref` after loading settings, SettingsDialog after saving. Auto = `navigator.language` in the UI, `sys-locale` in Rust.
+- Rust: `src-tauri/src/i18n.rs`, `tr!("vi {x}", "en {x}")` for tray items and command errors. Changing the setting calls `tray::refresh_menu`. Engine (`dm-core`) errors stay English; `errorText` in `lib/format.ts` maps the actionable ones to translated text.
+- Extension: `extension/_locales/{vi,en}/messages.json` (`default_locale: en`, the browser UI language picks). `dmT` / `dmApplyI18n` (`data-i18n`, `data-i18n-title`, …) in `common.js`; `content.js` calls `i18n.getMessage` itself. `dmBrowserName()` values are identifiers sent to the app, not UI text.
+- NSIS installer: English first (the fallback for other system languages), Vietnamese.
 
 ### Tests
 `crates/dm-core/tests/common/mod.rs` runs an in-process axum fixture server with misbehaving routes: `/file`, `/norange`, `/chunked`, `/flaky`, `/slow`, `/versioned` (+`/bump`), `/attachment`, `/limited` (429 above 2 connections), `/rangeforbidden`, and `/hls/{name}` (master, plain, AES-128, fMP4, byte-range, live, slow and extension-less playlists; tests in `tests/hls.rs`). Integration tests compare downloaded bytes exactly. New network edge cases should get a route there.

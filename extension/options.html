@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DownloadManager — Tùy chọn</title>
+    <title data-i18n="optionsTitle">DownloadManager — Tùy chọn</title>
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body class="options">
@@ -11,8 +11,8 @@
       <div class="page-head">
         <div class="logo"><img src="icons/icon64.png" alt="" /></div>
         <div>
-          <h1>DownloadManager Connector</h1>
-          <p>Chuyển lượt tải từ trình duyệt sang app để tải đa luồng.</p>
+          <h1 data-i18n="extName">DownloadManager Connector</h1>
+          <p data-i18n="optionsIntro">Chuyển lượt tải từ trình duyệt sang app để tải đa luồng.</p>
         </div>
         <span id="version" class="version"></span>
       </div>
@@ -26,21 +26,21 @@
               <line x1="8" x2="16" y1="12" y2="12" />
             </svg>
           </span>
-          <h2>Kết nối</h2>
+          <h2 data-i18n="connectionHeading">Kết nối</h2>
         </div>
         <div class="card-body">
           <div id="status" class="status status-card" data-state="checking">
             <span class="dot"></span>
             <div style="flex: 1">
-              <div id="status-title" class="title">Đang kiểm tra…</div>
-              <div id="status-desc" class="desc">Đang tìm app DownloadManager trên máy.</div>
+              <div id="status-title" class="title" data-i18n="statusChecking">Đang kiểm tra…</div>
+              <div id="status-desc" class="desc" data-i18n="statusCheckingDesc">Đang tìm app DownloadManager trên máy.</div>
             </div>
-            <button id="pair" class="btn btn-primary" hidden>Ghép cặp tự động</button>
+            <button id="pair" class="btn btn-primary" hidden data-i18n="pairAuto">Ghép cặp tự động</button>
           </div>
 
           <div class="grid-2">
             <div>
-              <label class="field-label" for="token">Mã ghép cặp</label>
+              <label class="field-label" for="token" data-i18n="tokenLabel">Mã ghép cặp</label>
               <div class="field affix">
                 <input
                   id="token"
@@ -49,18 +49,19 @@
                   spellcheck="false"
                   autocomplete="off"
                   placeholder="Dán mã từ app"
+                  data-i18n-placeholder="tokenPlaceholder"
                 />
-                <button id="toggle-token" class="icon-btn" type="button" title="Hiện mã" aria-label="Hiện mã">
+                <button id="toggle-token" class="icon-btn" type="button" title="Hiện mã" aria-label="Hiện mã" data-i18n-title="showToken" data-i18n-aria-label="showToken">
                   <svg class="i" viewBox="0 0 24 24">
                     <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
                 </button>
               </div>
-              <div class="field-help">DownloadManager → Cài đặt → Trình duyệt. Thường được điền tự động.</div>
+              <div class="field-help" data-i18n="tokenHelp">DownloadManager → Cài đặt → Trình duyệt. Thường được điền tự động.</div>
             </div>
             <div>
-              <label class="field-label" for="port">Cổng</label>
+              <label class="field-label" for="port" data-i18n="portLabel">Cổng</label>
               <input id="port" class="field mono" type="number" min="1" max="65535" />
             </div>
           </div>
@@ -76,13 +77,13 @@
               <path d="m7 10 5 5 5-5" />
             </svg>
           </span>
-          <h2>Bắt lượt tải</h2>
+          <h2 data-i18n="captureHeading">Bắt lượt tải</h2>
         </div>
         <div class="card-body">
           <label class="setting">
             <span class="text">
-              <span class="title">Tự chuyển lượt tải sang app</span>
-              <span class="desc" style="display: block">Khi tắt, mọi lượt tải đều do trình duyệt xử lý.</span>
+              <span class="title" data-i18n="enabledTitle">Tự chuyển lượt tải sang app</span>
+              <span class="desc" style="display: block" data-i18n="enabledDesc">Khi tắt, mọi lượt tải đều do trình duyệt xử lý.</span>
             </span>
             <span class="switch"><input type="checkbox" id="enabled" /><span class="track"></span></span>
           </label>
@@ -91,29 +92,29 @@
 
           <div>
             <label class="field-label" for="ext-input">
-              Đuôi tệp cần bắt <span id="ext-count" style="font-weight: 400; color: var(--mute)"></span>
+              <span data-i18n="extLabel">Đuôi tệp cần bắt</span> <span id="ext-count" style="font-weight: 400; color: var(--mute)"></span>
             </label>
             <div id="chips" class="field chips">
-              <input id="ext-input" spellcheck="false" autocomplete="off" placeholder="Thêm đuôi, vd: torrent" />
+              <input id="ext-input" spellcheck="false" autocomplete="off" placeholder="Thêm đuôi, vd: torrent" data-i18n-placeholder="extPlaceholder" />
             </div>
-            <div class="field-help">Nhấn <kbd>Enter</kbd> hoặc dấu cách để thêm, <kbd>Backspace</kbd> để xóa.</div>
+            <div class="field-help" data-i18n-html="extHelp">Nhấn <kbd>Enter</kbd> hoặc dấu cách để thêm, <kbd>Backspace</kbd> để xóa.</div>
           </div>
 
           <div style="max-width: 260px">
-            <label class="field-label" for="minSizeMB">Cũng bắt mọi tệp lớn hơn</label>
+            <label class="field-label" for="minSizeMB" data-i18n="minSizeLabel">Cũng bắt mọi tệp lớn hơn</label>
             <div class="field affix">
               <input id="minSizeMB" type="number" min="0" />
               <span class="suffix">MB</span>
             </div>
-            <div class="field-help">Đặt 0 để tắt.</div>
+            <div class="field-help" data-i18n="minSizeHelp">Đặt 0 để tắt.</div>
           </div>
 
           <hr class="divider" />
 
           <label class="setting">
             <span class="text">
-              <span class="title">Hiện nút “Tải video” trên trang</span>
-              <span class="desc" style="display: block">
+              <span class="title" data-i18n="videoButtonTitle">Hiện nút “Tải video” trên trang</span>
+              <span class="desc" style="display: block" data-i18n="videoButtonDesc">
                 Rê chuột vào video để gửi sang app. Hỗ trợ tệp video và luồng HLS (.m3u8). Danh sách video tìm thấy
                 luôn có trong cửa sổ của extension.
               </span>
@@ -127,7 +128,7 @@
               <path d="M9 18h6" />
               <path d="M10 22h4" />
             </svg>
-            <span>
+            <span data-i18n-html="optionsTip">
               Chuột phải vào liên kết → <b>Tải bằng DownloadManager</b> để gửi bất kỳ tệp nào. Nếu app không chạy,
               trình duyệt sẽ tải như bình thường.
             </span>
@@ -138,14 +139,14 @@
 
     <div class="actionbar">
       <div class="inner">
-        <button id="reset" class="btn btn-ghost">Khôi phục mặc định</button>
+        <button id="reset" class="btn btn-ghost" data-i18n="reset">Khôi phục mặc định</button>
         <span class="spacer"></span>
-        <span id="dirty" class="dirty-note" hidden>Có thay đổi chưa lưu</span>
+        <span id="dirty" class="dirty-note" hidden data-i18n="dirty">Có thay đổi chưa lưu</span>
         <span id="saved" class="saved">
           <svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
-          Đã lưu
+          <span data-i18n="saved">Đã lưu</span>
         </span>
-        <button id="save" class="btn btn-primary">Lưu thay đổi</button>
+        <button id="save" class="btn btn-primary" data-i18n="saveChanges">Lưu thay đổi</button>
       </div>
     </div>
 

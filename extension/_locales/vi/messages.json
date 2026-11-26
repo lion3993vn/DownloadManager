@@ -1,0 +1,248 @@
+{
+  "extName": {
+    "message": "DownloadManager Connector"
+  },
+  "extDescription": {
+    "message": "Chuyển các lượt tải từ trình duyệt sang DownloadManager để tải đa luồng, nhanh hơn."
+  },
+  "popupSubtitle": {
+    "message": "Tải đa luồng, nhanh hơn"
+  },
+  "popupSubtitleVersion": {
+    "message": "Tải đa luồng · v$1"
+  },
+  "options": {
+    "message": "Tùy chọn"
+  },
+  "statusChecking": {
+    "message": "Đang kiểm tra…"
+  },
+  "statusCheckingDesc": {
+    "message": "Đang tìm app DownloadManager trên máy."
+  },
+  "pairButton": {
+    "message": "Kết nối với app"
+  },
+  "mediaHeading": {
+    "message": "Video trên trang này"
+  },
+  "mediaEmpty": {
+    "message": "Chưa thấy video nào. Hãy bấm phát video trên trang rồi mở lại."
+  },
+  "captureTitle": {
+    "message": "Tự bắt lượt tải"
+  },
+  "captureDesc": {
+    "message": "Chuyển tệp phù hợp sang app"
+  },
+  "skipTitle": {
+    "message": "Bỏ qua lần tải tới"
+  },
+  "skipDesc": {
+    "message": "Để trình duyệt tự tải, chỉ một lần"
+  },
+  "skipActive": {
+    "message": "Đang bật"
+  },
+  "popupTip": {
+    "message": "Mẹo: chuột phải vào liên kết để gửi sang app"
+  },
+  "updating": {
+    "message": "Đang cập nhật lên v$1…"
+  },
+  "updatingDesc": {
+    "message": "Extension sẽ tự khởi động lại trong giây lát."
+  },
+  "outdatedTitle": {
+    "message": "Extension đã cũ (v$1)"
+  },
+  "outdatedDesc": {
+    "message": "App có bản v$1. Mở DownloadManager → Kết nối trình duyệt để cài lại."
+  },
+  "appNotRunning": {
+    "message": "App chưa chạy"
+  },
+  "appNotRunningDesc": {
+    "message": "Trình duyệt sẽ tự tải như bình thường."
+  },
+  "notPaired": {
+    "message": "Chưa ghép cặp"
+  },
+  "notPairedDesc": {
+    "message": "App đang chạy, bấm nút bên dưới để kết nối."
+  },
+  "connected": {
+    "message": "Đã kết nối"
+  },
+  "connectedDesc": {
+    "message": "Lượt tải phù hợp sẽ được chuyển sang app."
+  },
+  "pairWaiting": {
+    "message": "Đang chờ xác nhận…"
+  },
+  "pairWaitingDesc": {
+    "message": "Hãy bấm “Cho phép” trong cửa sổ DownloadManager."
+  },
+  "pairFailed": {
+    "message": "Ghép cặp thất bại"
+  },
+  "tryAgain": {
+    "message": "Hãy thử lại."
+  },
+  "mediaPageTitle": {
+    "message": "Video trên $1"
+  },
+  "mediaHlsTitle": {
+    "message": "Video HLS"
+  },
+  "mediaPageHint": {
+    "message": "Chọn chất lượng hoặc MP3 trong app"
+  },
+  "btnSent": {
+    "message": "✓ Đã gửi"
+  },
+  "btnRetry": {
+    "message": "Thử lại"
+  },
+  "btnDownload": {
+    "message": "Tải"
+  },
+  "sendVideoFailed": {
+    "message": "Không gửi được video"
+  },
+  "optionsTitle": {
+    "message": "DownloadManager — Tùy chọn"
+  },
+  "optionsIntro": {
+    "message": "Chuyển lượt tải từ trình duyệt sang app để tải đa luồng."
+  },
+  "connectionHeading": {
+    "message": "Kết nối"
+  },
+  "pairAuto": {
+    "message": "Ghép cặp tự động"
+  },
+  "tokenLabel": {
+    "message": "Mã ghép cặp"
+  },
+  "tokenPlaceholder": {
+    "message": "Dán mã từ app"
+  },
+  "showToken": {
+    "message": "Hiện mã"
+  },
+  "hideToken": {
+    "message": "Ẩn mã"
+  },
+  "tokenHelp": {
+    "message": "DownloadManager → Cài đặt → Trình duyệt. Thường được điền tự động."
+  },
+  "portLabel": {
+    "message": "Cổng"
+  },
+  "captureHeading": {
+    "message": "Bắt lượt tải"
+  },
+  "enabledTitle": {
+    "message": "Tự chuyển lượt tải sang app"
+  },
+  "enabledDesc": {
+    "message": "Khi tắt, mọi lượt tải đều do trình duyệt xử lý."
+  },
+  "extLabel": {
+    "message": "Đuôi tệp cần bắt"
+  },
+  "extPlaceholder": {
+    "message": "Thêm đuôi, vd: torrent"
+  },
+  "extHelp": {
+    "message": "Nhấn <kbd>Enter</kbd> hoặc dấu cách để thêm, <kbd>Backspace</kbd> để xóa."
+  },
+  "removeExt": {
+    "message": "Bỏ .$1"
+  },
+  "minSizeLabel": {
+    "message": "Cũng bắt mọi tệp lớn hơn"
+  },
+  "minSizeHelp": {
+    "message": "Đặt 0 để tắt."
+  },
+  "videoButtonTitle": {
+    "message": "Hiện nút “Tải video” trên trang"
+  },
+  "videoButtonDesc": {
+    "message": "Rê chuột vào video để gửi sang app. Hỗ trợ tệp video và luồng HLS (.m3u8). Danh sách video tìm thấy luôn có trong cửa sổ của extension."
+  },
+  "optionsTip": {
+    "message": "Chuột phải vào liên kết → <b>Tải bằng DownloadManager</b> để gửi bất kỳ tệp nào. Nếu app không chạy, trình duyệt sẽ tải như bình thường."
+  },
+  "reset": {
+    "message": "Khôi phục mặc định"
+  },
+  "dirty": {
+    "message": "Có thay đổi chưa lưu"
+  },
+  "saved": {
+    "message": "Đã lưu"
+  },
+  "saveChanges": {
+    "message": "Lưu thay đổi"
+  },
+  "optNotRunning": {
+    "message": "Không thấy app đang chạy"
+  },
+  "optNotRunningDesc": {
+    "message": "Mở DownloadManager rồi tải lại trang này."
+  },
+  "tokenWrong": {
+    "message": "Mã ghép cặp chưa đúng"
+  },
+  "tokenWrongDesc": {
+    "message": "Bấm “Ghép cặp tự động” hoặc dán mã từ app."
+  },
+  "optConnectedDesc": {
+    "message": "Extension đang hoạt động cùng DownloadManager."
+  },
+  "resetConfirm": {
+    "message": "Khôi phục cài đặt bắt lượt tải về mặc định? Mã ghép cặp được giữ nguyên."
+  },
+  "menuDownload": {
+    "message": "Tải bằng DownloadManager"
+  },
+  "errAppUnreachable": {
+    "message": "Không kết nối được tới app. Hãy mở DownloadManager."
+  },
+  "problemLive": {
+    "message": "Đang phát trực tiếp"
+  },
+  "problemSplitAudio": {
+    "message": "Tiếng tách riêng"
+  },
+  "errNotConnected": {
+    "message": "Chưa kết nối với app"
+  },
+  "errAppRejected": {
+    "message": "App không nhận (hãy mở DownloadManager)"
+  },
+  "errVideoGone": {
+    "message": "Không còn thấy video này"
+  },
+  "errNoStream": {
+    "message": "Không tìm thấy luồng tải được"
+  },
+  "videoButton": {
+    "message": "Tải video"
+  },
+  "sending": {
+    "message": "Đang gửi…"
+  },
+  "sentToApp": {
+    "message": "Đã gửi sang app"
+  },
+  "sendFailed": {
+    "message": "Không gửi được"
+  },
+  "openApp": {
+    "message": "Hãy mở DownloadManager"
+  }
+}

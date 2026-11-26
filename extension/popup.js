@@ -1,5 +1,9 @@
 const $ = (id) => document.getElementById(id);
 
+dmApplyI18n();
+// Badge text of the "skip next" row (CSS `content: attr(data-on-label)`).
+document.querySelector("#skip-row .title").dataset.onLabel = dmT("skipActive");
+
 function setStatus(state, title, desc) {
   $("status").dataset.state = state;
   $("status-title").textContent = title;
@@ -12,7 +16,7 @@ function renderSkip(on) {
 }
 
 const VERSION = ext.runtime.getManifest().version;
-$("subtitle").textContent = `Tải đa luồng · v${VERSION}`;
+$("subtitle").textContent = dmT("popupSubtitleVersion", VERSION);
 
 function showUpdate(state, title, desc) {
   $("update").hidden = false;
@@ -28,7 +32,7 @@ async function refresh() {
   // Newer files on disk (the app refreshed the folder): reload into them.
   const reloadingTo = await dmSelfUpdate().catch(() => null);
   if (reloadingTo) {
-    showUpdate("checking", `Đang cập nhật lên v${reloadingTo}…`, "Extension sẽ tự khởi động lại trong giây lát.");
+    showUpdate("checking", dmT("updating", reloadingTo), dmT("updatingDesc"));
     return;
   }
   const { running, paired, extensionVersion } = await dmEnsurePaired();
@@ -37,18 +41,18 @@ async function refresh() {
     // installed from another folder (or a store), so it must be reinstalled.
     showUpdate(
       "warn",
-      `Extension đã cũ (v${VERSION})`,
-      `App có bản v${extensionVersion}. Mở DownloadManager → Kết nối trình duyệt để cài lại.`,
+      dmT("outdatedTitle", VERSION),
+      dmT("outdatedDesc", extensionVersion),
     );
   }
   if (!running) {
-    setStatus("warn", "App chưa chạy", "Trình duyệt sẽ tự tải như bình thường.");
+    setStatus("warn", dmT("appNotRunning"), dmT("appNotRunningDesc"));
     $("pair").hidden = true;
   } else if (!paired) {
-    setStatus("warn", "Chưa ghép cặp", "App đang chạy, bấm nút bên dưới để kết nối.");
+    setStatus("warn", dmT("notPaired"), dmT("notPairedDesc"));
     $("pair").hidden = false;
   } else {
-    setStatus("ok", "Đã kết nối", "Lượt tải phù hợp sẽ được chuyển sang app.");
+    setStatus("ok", dmT("connected"), dmT("connectedDesc"));
     $("pair").hidden = true;
   }
 }
@@ -64,11 +68,11 @@ $("skip").addEventListener("change", async (e) => {
 
 $("pair").addEventListener("click", async () => {
   $("pair").disabled = true;
-  setStatus("checking", "Đang chờ xác nhận…", "Hãy bấm “Cho phép” trong cửa sổ DownloadManager.");
+  setStatus("checking", dmT("pairWaiting"), dmT("pairWaitingDesc"));
   const res = await ext.runtime.sendMessage({ type: "pair" });
   $("pair").disabled = false;
   if (!res?.ok) {
-    setStatus("error", "Ghép cặp thất bại", res?.error || "Hãy thử lại.");
+    setStatus("error", dmT("pairFailed"), res?.error || dmT("tryAgain"));
     return;
   }
   refresh();
@@ -140,14 +144,14 @@ function renderMedia(items) {
     const text = el("div", "media-text");
     const title =
       item.type === "page"
-        ? `Video trên ${item.site}`
+        ? dmT("mediaPageTitle", item.site)
         : item.type === "hls"
-        ? `Video HLS${item.resolution ? ` · ${Math.min(...item.resolution)}p` : ""}`
+        ? `${dmT("mediaHlsTitle")}${item.resolution ? ` · ${Math.min(...item.resolution)}p` : ""}`
         : item.urlName || item.label;
     const t = el("div", "media-title", title);
     t.title = item.url;
     const meta = [];
-    if (item.type === "page") meta.push("Chọn chất lượng hoặc MP3 trong app");
+    if (item.type === "page") meta.push(dmT("mediaPageHint"));
     else if (item.type !== "hls") meta.push(item.label);
     if (item.duration && !item.live) meta.push(formatDuration(item.duration));
     if (item.size) meta.push((item.type === "hls" ? "≈ " : "") + formatBytes(item.size));
@@ -158,7 +162,8 @@ function renderMedia(items) {
 
     const state = sendState.get(item.id);
     const btn = el("button", "btn btn-primary btn-sm");
-    btn.textContent = state === "busy" ? "…" : state === "ok" ? "✓ Đã gửi" : state === "err" ? "Thử lại" : "Tải";
+    btn.textContent =
+      state === "busy" ? "…" : state === "ok" ? dmT("btnSent") : state === "err" ? dmT("btnRetry") : dmT("btnDownload");
     if (state === "ok") btn.className = "btn btn-sm btn-done";
     btn.disabled = Boolean(item.problem) || state === "busy";
     btn.addEventListener("click", () => download(item));
@@ -188,7 +193,7 @@ async function download(item) {
   refreshMedia();
   const res = await ext.runtime.sendMessage({ type: "media-download", tabId, id: item.id });
   sendState.set(item.id, res && res.ok ? "ok" : "err");
-  if (!(res && res.ok)) setStatus("error", "Không gửi được video", (res && res.error) || "Hãy thử lại.");
+  if (!(res && res.ok)) setStatus("error", dmT("sendVideoFailed"), (res && res.error) || dmT("tryAgain"));
   lastJson = "";
   refreshMedia();
 }

@@ -4,6 +4,7 @@
 //! - Updates use `tauri-plugin-updater` with the signed `latest.json` that
 //!   CI attaches to every release (see `plugins.updater` in tauri.conf.json).
 
+use crate::i18n::tr;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -64,11 +65,20 @@ struct DownloadProgress {
 fn friendly(e: tauri_plugin_updater::Error) -> String {
     let raw = e.to_string();
     if raw.contains("valid release JSON") || raw.contains("404") {
-        "Chưa có bản phát hành hỗ trợ tự cập nhật trên GitHub.".into()
+        tr!(
+            "Chưa có bản phát hành hỗ trợ tự cập nhật trên GitHub.",
+            "There is no release with auto-update support on GitHub yet."
+        )
     } else if raw.contains("signature") {
-        format!("Chữ ký bản cập nhật không hợp lệ, đã hủy để an toàn ({raw}).")
+        tr!(
+            "Chữ ký bản cập nhật không hợp lệ, đã hủy để an toàn ({raw}).",
+            "The update signature is invalid; the update was canceled for safety ({raw})."
+        )
     } else {
-        format!("Không kiểm tra được cập nhật: {raw}")
+        tr!(
+            "Không kiểm tra được cập nhật: {raw}",
+            "Could not check for updates: {raw}"
+        )
     }
 }
 
@@ -94,7 +104,7 @@ pub async fn check(app: &AppHandle) -> Result<UpdateStatus, String> {
 /// installer runs in passive mode and the app exits while it replaces files.
 pub async fn install(app: AppHandle) -> Result<(), String> {
     if INSTALLING.swap(true, Ordering::SeqCst) {
-        return Err("Đang cập nhật…".into());
+        return Err(tr!("Đang cập nhật…", "Updating…"));
     }
     let result = install_inner(&app).await;
     INSTALLING.store(false, Ordering::SeqCst);
@@ -108,7 +118,12 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
         .check()
         .await
         .map_err(friendly)?
-        .ok_or("Bạn đang dùng phiên bản mới nhất.")?;
+        .ok_or_else(|| {
+            tr!(
+                "Bạn đang dùng phiên bản mới nhất.",
+                "You are on the latest version."
+            )
+        })?;
 
     let mut downloaded = 0u64;
     let mut last_emit = Instant::now() - Duration::from_secs(1);
@@ -138,7 +153,7 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
             "update dry run: downloaded and verified"
         );
         return Err(format!(
-            "[dev] Dry run: đã tải {} bytes và xác minh chữ ký v{} thành công — bỏ qua bước cài.",
+            "[dev] Dry run: downloaded {} bytes and verified the v{} signature; skipping the install.",
             bytes.len(),
             update.version
         ));
@@ -149,7 +164,10 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
     engine.shutdown().await;
     if let Err(e) = update.install(bytes) {
         engine.restart_after_shutdown();
-        return Err(format!("Cài bản cập nhật thất bại: {e}"));
+        return Err(tr!(
+            "Cài bản cập nhật thất bại: {e}",
+            "Installing the update failed: {e}"
+        ));
     }
     app.restart();
 }
@@ -168,11 +186,26 @@ pub async fn releases() -> Result<Vec<ReleaseInfo>, String> {
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
-        .map_err(|e| format!("Không kết nối được GitHub: {e}"))?;
+        .map_err(|e| {
+            tr!(
+                "Không kết nối được GitHub: {e}",
+                "Could not connect to GitHub: {e}"
+            )
+        })?;
     match resp.status().as_u16() {
         200 => {}
-        403 | 429 => return Err("GitHub tạm giới hạn số lần truy vấn, thử lại sau ít phút.".into()),
-        s => return Err(format!("GitHub trả về lỗi HTTP {s}.")),
+        403 | 429 => {
+            return Err(tr!(
+                "GitHub tạm giới hạn số lần truy vấn, thử lại sau ít phút.",
+                "GitHub is rate-limiting requests; try again in a few minutes."
+            ))
+        }
+        s => {
+            return Err(tr!(
+                "GitHub trả về lỗi HTTP {s}.",
+                "GitHub returned HTTP error {s}."
+            ))
+        }
     }
     let text = resp.text().await.map_err(|e| e.to_string())?;
     let list: Vec<GhRelease> = serde_json::from_str(&text).map_err(|e| e.to_string())?;

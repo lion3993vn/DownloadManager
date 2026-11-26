@@ -1,7 +1,8 @@
-import { errorText, formatBytes, formatEta, formatRelative, formatSpeed, hostOf, STATUS_LABEL, STATUS_PILL } from "../lib/format";
+import { errorText, formatBytes, formatEta, formatRelative, formatSpeed, hostOf, statusLabel, STATUS_PILL } from "../lib/format";
 import type { Row } from "../lib/useDownloads";
 import { FileTile } from "./FileTile";
 import { SegmentBar } from "./SegmentBar";
+import { useT } from "../i18n";
 import { FolderIcon, MoreIcon, OpenIcon, PauseIcon, PlayIcon, RetryIcon } from "./Icons";
 
 export interface RowActions {
@@ -20,31 +21,32 @@ interface Props {
 }
 
 function PrimaryAction({ r, a }: { r: Row; a: RowActions }) {
+  const t = useT();
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   switch (r.status) {
     case "downloading":
     case "queued":
       return (
-        <button className="icon-btn" title="Tạm dừng" onClick={(e) => (stop(e), a.pause(r))}>
+        <button className="icon-btn" title={t("shell.pause")} onClick={(e) => (stop(e), a.pause(r))}>
           <PauseIcon />
         </button>
       );
     case "paused":
       return (
-        <button className="icon-btn" title="Tiếp tục" onClick={(e) => (stop(e), a.resume(r))}>
+        <button className="icon-btn" title={t("shell.resume")} onClick={(e) => (stop(e), a.resume(r))}>
           <PlayIcon />
         </button>
       );
     case "failed":
     case "canceled":
       return (
-        <button className="icon-btn" title="Tải lại" onClick={(e) => (stop(e), a.resume(r))}>
+        <button className="icon-btn" title={t("shell.redownload")} onClick={(e) => (stop(e), a.resume(r))}>
           <RetryIcon />
         </button>
       );
     case "completed":
       return (
-        <button className="icon-btn" title="Mở tệp" onClick={(e) => (stop(e), a.open(r))}>
+        <button className="icon-btn" title={t("shell.openFile")} onClick={(e) => (stop(e), a.open(r))}>
           <OpenIcon />
         </button>
       );
@@ -52,6 +54,7 @@ function PrimaryAction({ r, a }: { r: Row; a: RowActions }) {
 }
 
 function Meta({ r }: { r: Row }) {
+  const t = useT();
   const pct = r.totalSize ? Math.min(100, (r.downloaded / r.totalSize) * 100) : null;
   if (r.status === "completed") {
     return (
@@ -70,7 +73,7 @@ function Meta({ r }: { r: Row }) {
   if (r.downloaded === 0 && r.totalSize == null && (r.status === "paused" || r.status === "queued")) {
     return (
       <>
-        <span className="shrink-0">Chưa bắt đầu</span>
+        <span className="shrink-0">{t("shell.notStarted")}</span>
         <Dot />
         <span className="truncate">{hostOf(r.url)}</span>
       </>
@@ -87,7 +90,7 @@ function Meta({ r }: { r: Row }) {
       {r.status === "downloading" && (
         <>
           <Dot />
-          <span className="shrink-0 whitespace-nowrap tabular-nums">{r.activeConnections} luồng</span>
+          <span className="shrink-0 whitespace-nowrap tabular-nums">{t("shell.connections", { n: r.activeConnections })}</span>
         </>
       )}
     </>
@@ -97,6 +100,7 @@ function Meta({ r }: { r: Row }) {
 const Dot = () => <span className="shrink-0 text-faint">·</span>;
 
 export function DownloadList({ rows, selected, onSelect, actions }: Props) {
+  const t = useT();
   return (
     <ul className="space-y-1.5 px-5 pb-6">
       {rows.map((r) => {
@@ -126,7 +130,7 @@ export function DownloadList({ rows, selected, onSelect, actions }: Props) {
                   {r.fileName}
                 </span>
                 <span className={`shrink-0 rounded-full px-2 py-px text-[10.5px] font-medium ${STATUS_PILL[r.status]}`}>
-                  {STATUS_LABEL[r.status]}
+                  {statusLabel(r.status)}
                 </span>
               </div>
               {r.status !== "completed" && (
@@ -150,7 +154,7 @@ export function DownloadList({ rows, selected, onSelect, actions }: Props) {
                 <PrimaryAction r={r} a={actions} />
                 <button
                   className="icon-btn"
-                  title="Mở thư mục"
+                  title={t("shell.openFolder")}
                   onClick={(e) => {
                     e.stopPropagation();
                     actions.folder(r);
@@ -160,7 +164,7 @@ export function DownloadList({ rows, selected, onSelect, actions }: Props) {
                 </button>
                 <button
                   className="icon-btn"
-                  title="Thêm"
+                  title={t("shell.more")}
                   onClick={(e) => {
                     e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();

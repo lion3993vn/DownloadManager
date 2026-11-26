@@ -379,8 +379,8 @@ function mediaUrlName(url) {
 
 /** Unsupported items are still listed, with the reason. */
 function mediaProblem(item) {
-  if (item.live) return "Đang phát trực tiếp";
-  if (item.splitAudio) return "Tiếng tách riêng";
+  if (item.live) return dmT("problemLive");
+  if (item.splitAudio) return dmT("problemSplitAudio");
   return null;
 }
 
@@ -450,7 +450,7 @@ function mediaLabel(item) {
 
 async function mediaSend(tabId, item) {
   const s = await pairedSettings();
-  if (!s) return { ok: false, error: "Chưa kết nối với app" };
+  if (!s) return { ok: false, error: dmT("errNotConnected") };
   let tab = null;
   try {
     tab = await ext.tabs.get(tabId);
@@ -474,7 +474,7 @@ async function mediaSend(tabId, item) {
     });
   }
   flashBadge(ok ? "✓" : "!", ok ? "#16a34a" : "#dc2626", tabId);
-  return ok ? { ok: true } : { ok: false, error: "App không nhận (hãy mở DownloadManager)" };
+  return ok ? { ok: true } : { ok: false, error: dmT("errAppRejected") };
 }
 
 async function mediaTabUrl(tabId) {
@@ -548,7 +548,7 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         msg.id === "page"
           ? await mediaTabPage(msg.tabId)
           : (await mediaLoad(msg.tabId)).find((i) => i.id === msg.id);
-      return item ? mediaSend(msg.tabId, item) : { ok: false, error: "Không còn thấy video này" };
+      return item ? mediaSend(msg.tabId, item) : { ok: false, error: dmT("errVideoGone") };
     },
     // Content script: what the video element under the pointer can be saved as.
     "media-best": async () => {
@@ -560,7 +560,7 @@ ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     "media-download-best": async () => {
       if (!sender.tab) return { ok: false };
       const item = await mediaForElement(sender.tab.id, sender.frameId, msg.src, msg.pages, msg.direct);
-      if (!item) return { ok: false, error: "Không tìm thấy luồng tải được" };
+      if (!item) return { ok: false, error: dmT("errNoStream") };
       return mediaSend(sender.tab.id, item);
     },
   };

@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
+dmApplyI18n();
+
 let exts = [];
 
 function setStatus(state, title, desc) {
@@ -29,7 +31,7 @@ function renderChips() {
     chip.textContent = e;
     const x = document.createElement("button");
     x.type = "button";
-    x.title = `Bỏ .${e}`;
+    x.title = dmT("removeExt", e);
     x.innerHTML = '<svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
     x.addEventListener("click", () => {
       exts = exts.filter((v) => v !== e);
@@ -102,7 +104,7 @@ async function load() {
 }
 
 async function checkStatus() {
-  setStatus("checking", "Đang kiểm tra…", "Đang tìm app DownloadManager trên máy.");
+  setStatus("checking", dmT("statusChecking"), dmT("statusCheckingDesc"));
   const { running, paired, settings } = await dmEnsurePaired();
   // dmEnsurePaired may have adopted the bundled token; show it unless the user is editing.
   if ($("dirty").hidden) {
@@ -110,13 +112,13 @@ async function checkStatus() {
     $("port").value = settings.port;
   }
   if (!running) {
-    setStatus("warn", "Không thấy app đang chạy", "Mở DownloadManager rồi tải lại trang này.");
+    setStatus("warn", dmT("optNotRunning"), dmT("optNotRunningDesc"));
     $("pair").hidden = true;
   } else if (!paired) {
-    setStatus("warn", "Mã ghép cặp chưa đúng", "Bấm “Ghép cặp tự động” hoặc dán mã từ app.");
+    setStatus("warn", dmT("tokenWrong"), dmT("tokenWrongDesc"));
     $("pair").hidden = false;
   } else {
-    setStatus("ok", "Đã kết nối", "Extension đang hoạt động cùng DownloadManager.");
+    setStatus("ok", dmT("connected"), dmT("optConnectedDesc"));
     $("pair").hidden = true;
   }
 }
@@ -129,7 +131,9 @@ $("toggle-token").addEventListener("click", () => {
   const t = $("token");
   const show = t.type === "password";
   t.type = show ? "text" : "password";
-  $("toggle-token").title = show ? "Ẩn mã" : "Hiện mã";
+  const label = dmT(show ? "hideToken" : "showToken");
+  $("toggle-token").title = label;
+  $("toggle-token").setAttribute("aria-label", label);
 });
 
 $("save").addEventListener("click", async () => {
@@ -153,7 +157,7 @@ $("save").addEventListener("click", async () => {
 });
 
 $("reset").addEventListener("click", async () => {
-  if (!confirm("Khôi phục cài đặt bắt lượt tải về mặc định? Mã ghép cặp được giữ nguyên.")) return;
+  if (!confirm(dmT("resetConfirm"))) return;
   const { token, port } = await dmSettings();
   await ext.storage.local.clear();
   await ext.storage.local.set({ token, port });
@@ -163,11 +167,11 @@ $("reset").addEventListener("click", async () => {
 $("pair").addEventListener("click", async () => {
   $("pair").disabled = true;
   await ext.storage.local.set({ port: Number($("port").value) || DM_DEFAULTS.port });
-  setStatus("checking", "Đang chờ xác nhận…", "Hãy bấm “Cho phép” trong cửa sổ DownloadManager.");
+  setStatus("checking", dmT("pairWaiting"), dmT("pairWaitingDesc"));
   const res = await ext.runtime.sendMessage({ type: "pair" });
   $("pair").disabled = false;
   if (!res?.ok) {
-    setStatus("error", "Ghép cặp thất bại", res?.error || "Hãy thử lại.");
+    setStatus("error", dmT("pairFailed"), res?.error || dmT("tryAgain"));
     return;
   }
   setDirty(false);

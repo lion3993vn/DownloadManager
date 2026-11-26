@@ -18,6 +18,7 @@ import {
   VideoIcon,
 } from "./Icons";
 import { MediaToolsPanel } from "./MediaTools";
+import { LANGUAGES, normalizePref, setLanguagePref, useT, type MessageKey } from "../i18n";
 
 interface Props {
   theme: ThemePref;
@@ -34,12 +35,12 @@ interface Props {
 type Tab = "download" | "video" | "browser" | "app" | "about";
 type IconT = ComponentType<SVGProps<SVGSVGElement>>;
 
-const TABS: { key: Tab; label: string; icon: IconT }[] = [
-  { key: "download", label: "Tải xuống", icon: DownloadIcon },
-  { key: "video", label: "Video", icon: VideoIcon },
-  { key: "browser", label: "Trình duyệt", icon: PuzzleIcon },
-  { key: "app", label: "Giao diện", icon: SettingsIcon },
-  { key: "about", label: "Giới thiệu", icon: InfoIcon },
+const TABS: { key: Tab; label: MessageKey; icon: IconT }[] = [
+  { key: "download", label: "settings.tab.download", icon: DownloadIcon },
+  { key: "video", label: "settings.tab.video", icon: VideoIcon },
+  { key: "browser", label: "settings.tab.browser", icon: PuzzleIcon },
+  { key: "app", label: "settings.tab.app", icon: SettingsIcon },
+  { key: "about", label: "settings.tab.about", icon: InfoIcon },
 ];
 
 function Row({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -75,6 +76,7 @@ function Stepper({ value, min, max, onChange, suffix }: { value: number; min: nu
 }
 
 export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onInstallExtension, onTokenRegenerated, version, onChangelog }: Props) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("download");
   const [s, setS] = useState<Settings | null>(null);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
@@ -85,7 +87,8 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
     api
       .getSettings()
       .then((v) => {
-        setS(v);
+        // Settings saved before the language option existed have no value.
+        setS({ ...v, app: { ...v.app, language: normalizePref(v.app.language) } });
         setLimitOn(v.engine.speedLimit > 0);
       })
       .catch((e) => onError(String(e)));
@@ -100,7 +103,9 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
   async function save() {
     try {
       const toSave = { ...s!, engine: { ...s!.engine, speedLimit: limitOn ? Math.max(s!.engine.speedLimit, 1024) : 0 } };
-      onSaved(await api.saveSettings(toSave));
+      const saved = await api.saveSettings(toSave);
+      setLanguagePref(normalizePref(saved.app.language));
+      onSaved(saved);
       onClose();
     } catch (e) {
       onError(String(e));
@@ -109,7 +114,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
 
   return (
     <Modal
-      title="Cài đặt"
+      title={t("settings.title")}
       icon={<SettingsIcon />}
       onClose={onClose}
       width="max-w-[720px]"
@@ -117,10 +122,10 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Hủy
+            {t("common.cancel")}
           </button>
           <button className="btn-primary min-w-[96px]" onClick={save}>
-            Lưu
+            {t("common.save")}
           </button>
         </>
       }
@@ -135,7 +140,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                 tab === key ? "bg-card font-medium text-ink shadow-card" : "text-ink-2 hover:bg-ink/[0.045]"
               }`}
             >
-              <Icon className={`h-4 w-4 ${tab === key ? "text-brand" : "text-mute"}`} /> {label}
+              <Icon className={`h-4 w-4 ${tab === key ? "text-brand" : "text-mute"}`} /> {t(label)}
             </button>
           ))}
         </nav>
@@ -144,7 +149,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
           {tab === "video" && <MediaToolsPanel onError={onError} />}
           {tab === "download" && (
             <>
-              <Field label="Thư mục lưu mặc định">
+              <Field label={t("settings.downloadDir")}>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <FolderIcon className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint" />
@@ -157,18 +162,18 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                       if (typeof dir === "string") setEngine({ downloadDir: dir });
                     }}
                   >
-                    Chọn…
+                    {t("settings.browse")}
                   </button>
                 </div>
               </Field>
               <div className="mt-3">
-                <Row title="Kết nối cho mỗi tệp" hint="Số đoạn tải song song (1–32).">
+                <Row title={t("settings.connections")} hint={t("settings.connectionsHint")}>
                   <Stepper value={eng.connections} min={1} max={32} onChange={(v) => setEngine({ connections: v })} />
                 </Row>
-                <Row title="Số tệp tải cùng lúc" hint="Các tệp còn lại sẽ xếp hàng chờ.">
+                <Row title={t("settings.maxConcurrent")} hint={t("settings.maxConcurrentHint")}>
                   <Stepper value={eng.maxConcurrent} min={1} max={20} onChange={(v) => setEngine({ maxConcurrent: v })} />
                 </Row>
-                <Row title="Giới hạn tốc độ" hint="Áp dụng cho tổng tất cả lượt tải.">
+                <Row title={t("settings.speedLimit")} hint={t("settings.speedLimitHint")}>
                   <div className="flex items-center gap-3">
                     {limitOn && (
                       <div className="flex items-center gap-1.5">
@@ -199,9 +204,9 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
               <div className="flex items-center gap-3 rounded-xl border border-line bg-panel/60 p-4">
                 <span className={`h-2.5 w-2.5 rounded-full ${bridge?.running ? "bg-emerald-500" : "bg-red-500"}`} />
                 <div className="flex-1">
-                  <div className="text-[13px] font-medium">{bridge?.running ? "Đang lắng nghe extension" : "Cầu nối không chạy"}</div>
+                  <div className="text-[13px] font-medium">{bridge?.running ? t("settings.bridgeRunning") : t("settings.bridgeStopped")}</div>
                   <div className="text-[12px] text-mute">
-                    {bridge?.running ? `127.0.0.1:${bridge.port} — chỉ nhận kết nối từ máy này` : (bridge?.error ?? "")}
+                    {bridge?.running ? t("settings.bridgeLocal", { port: bridge.port }) : (bridge?.error ?? "")}
                   </div>
                 </div>
                 <button
@@ -211,17 +216,17 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                     onInstallExtension();
                   }}
                 >
-                  <PuzzleIcon /> Cài extension
+                  <PuzzleIcon /> {t("settings.installExtension")}
                 </button>
               </div>
               <div className="mt-2">
-                <Row title="Hỏi trước khi tải" hint="Hiện hộp xác nhận khi bắt được tệp từ trình duyệt.">
+                <Row title={t("settings.confirmCaptures")} hint={t("settings.confirmCapturesHint")}>
                   <Switch checked={s.app.confirmCaptures} onChange={(v) => setApp({ confirmCaptures: v })} />
                 </Row>
               </div>
               <Field
-                label="Mã ghép cặp"
-                hint="Extension cài từ app tự dùng mã này. Tạo mã mới sẽ ngắt kết nối các extension cũ cho tới khi chúng tự cập nhật."
+                label={t("settings.token")}
+                hint={t("settings.tokenHint")}
               >
                 <div className="flex gap-2">
                   <input readOnly className="field font-mono text-[12px]" value={s.app.bridgeToken} />
@@ -233,11 +238,11 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                       setTimeout(() => setCopied(false), 1500);
                     }}
                   >
-                    <CopyIcon /> {copied ? "Đã chép" : "Chép"}
+                    <CopyIcon /> {copied ? t("common.copied") : t("common.copy")}
                   </button>
                   <button
                     className="btn-outline px-2.5"
-                    title="Tạo mã mới"
+                    title={t("settings.newToken")}
                     onClick={async () => {
                       setApp({ bridgeToken: await api.regenerateToken() });
                       onTokenRegenerated();
@@ -252,13 +257,31 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
 
           {tab === "app" && (
             <>
-              <Field label="Chủ đề">
+              <Field label={t("settings.language")}>
+                <div className="flex gap-1 rounded-lg bg-panel p-1">
+                  {[{ value: "auto", label: t("settings.languageAuto") }, ...LANGUAGES].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setApp({ language: value })}
+                      aria-pressed={s.app.language === value}
+                      className={`flex-1 rounded-md py-1.5 text-[12.5px] font-medium transition ${
+                        s.app.language === value ? "bg-card text-brand shadow-card" : "text-mute hover:text-ink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <div className="mt-4" />
+              <Field label={t("settings.theme")}>
                 <div className="grid grid-cols-3 gap-2">
                   {(
                     [
-                      ["system", "Theo hệ thống", MonitorIcon],
-                      ["light", "Sáng", SunIcon],
-                      ["dark", "Tối", MoonIcon],
+                      ["system", "settings.themeSystem", MonitorIcon],
+                      ["light", "settings.themeLight", SunIcon],
+                      ["dark", "settings.themeDark", MoonIcon],
                     ] as const
                   ).map(([key, label, Icon]) => (
                     <button
@@ -268,16 +291,16 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                         theme === key ? "border-brand bg-brand/5 font-medium text-brand ring-4 ring-brand/10" : "border-line text-ink-2 hover:border-line-strong"
                       }`}
                     >
-                      <Icon className="h-5 w-5" /> {label}
+                      <Icon className="h-5 w-5" /> {t(label)}
                     </button>
                   ))}
                 </div>
               </Field>
               <div className="mt-3">
-                <Row title="Khởi động cùng hệ thống" hint="Tự chạy khi đăng nhập máy, ẩn dưới khay hệ thống để tiếp tục các lượt tải dở.">
+                <Row title={t("settings.autostart")} hint={t("settings.autostartHint")}>
                   <Switch checked={s.autostart} onChange={(v) => setS({ ...s, autostart: v })} />
                 </Row>
-                <Row title="Chạy nền khi đóng cửa sổ" hint="Thu nhỏ xuống khay hệ thống để vẫn tải và bắt link từ trình duyệt.">
+                <Row title={t("settings.closeToTray")} hint={t("settings.closeToTrayHint")}>
                   <Switch checked={s.app.closeToTray} onChange={(v) => setApp({ closeToTray: v })} />
                 </Row>
               </div>
@@ -290,7 +313,7 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                 <DownloadIcon className="h-8 w-8" strokeWidth={2.4} />
               </div>
               <h3 className="mt-4 text-[17px] font-semibold">DownloadManager</h3>
-              <p className="text-[12px] text-mute">Phiên bản {version || "…"}</p>
+              <p className="text-[12px] text-mute">{t("settings.version", { version: version || "…" })}</p>
               <button
                 className="btn-primary mt-4"
                 onClick={() => {
@@ -298,11 +321,10 @@ export function SettingsDialog({ theme, onTheme, onClose, onSaved, onError, onIn
                   onChangelog();
                 }}
               >
-                <SparklesIcon /> Kiểm tra cập nhật & xem có gì mới
+                <SparklesIcon /> {t("settings.checkUpdates")}
               </button>
               <p className="mt-4 max-w-sm text-[12.5px] leading-relaxed text-mute">
-                Tải tệp nhanh hơn bằng cách chia nhỏ và tải song song nhiều đoạn. Hỗ trợ tạm dừng, tiếp tục sau khi tắt máy, và tự
-                bắt lượt tải từ trình duyệt.
+                {t("settings.aboutText")}
               </p>
               <p className="mt-4 text-[11.5px] text-faint">Rust · Tauri · React</p>
             </div>

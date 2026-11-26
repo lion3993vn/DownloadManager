@@ -37,7 +37,10 @@ pub fn start(app: AppHandle) {
                 *state.bridge.write().unwrap() = crate::state::BridgeStatus {
                     running: false,
                     port,
-                    error: Some(format!("Không mở được cổng {port}: {e}")),
+                    error: Some(crate::i18n::tr!(
+                        "Không mở được cổng {port}: {e}",
+                        "Could not open port {port}: {e}"
+                    )),
                 };
                 return;
             }

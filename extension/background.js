@@ -166,7 +166,7 @@ function createMenu() {
   ext.contextMenus.removeAll(() => {
     ext.contextMenus.create({
       id: MENU_ID,
-      title: "Tải bằng DownloadManager",
+      title: dmT("menuDownload"),
       contexts: ["link", "video", "audio", "image"],
     });
   });
@@ -254,7 +254,7 @@ ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: false, error: body.error || `HTTP ${res.status}` });
       }
     } catch {
-      sendResponse({ ok: false, error: "Không kết nối được tới app. Hãy mở DownloadManager." });
+      sendResponse({ ok: false, error: dmT("errAppUnreachable") });
     }
   })();
   return true; // async response

@@ -59,5 +59,10 @@ pub fn is_enabled() -> bool {
 pub fn set_enabled(enabled: bool) -> Result<(), String> {
     let l = launcher()?;
     let result = if enabled { l.enable() } else { l.disable() };
-    result.map_err(|e| format!("Không thể đổi chế độ khởi động cùng hệ thống: {e}"))
+    result.map_err(|e| {
+        crate::i18n::tr!(
+            "Không thể đổi chế độ khởi động cùng hệ thống: {e}",
+            "Could not change the start-with-system setting: {e}"
+        )
+    })
 }

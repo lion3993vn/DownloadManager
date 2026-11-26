@@ -1,0 +1,61 @@
+// Video tools (yt-dlp + ffmpeg): components/MediaTools.tsx.
+import { defineMessages } from "../define";
+
+export default defineMessages({
+  vi: {
+    "media.step.ytdlp": "Đang tải yt-dlp",
+    "media.step.ffmpeg": "Đang tải ffmpeg",
+    "media.step.extract": "Đang giải nén ffmpeg",
+    "media.step.update": "Đang cập nhật yt-dlp",
+    "media.preparing": "Đang chuẩn bị…",
+
+    "media.card.title": "Cần cài công cụ tải video",
+    "media.card.before": "Để tải từ YouTube, TikTok, Facebook… app dùng",
+    "media.card.and": "và",
+    "media.card.after": "(mã nguồn mở). Chỉ cần cài một lần",
+    "media.card.size": ", khoảng {size}",
+    "media.card.end": ". App tự cập nhật chúng về sau.",
+    "media.install": "Cài đặt",
+
+    "media.checking": "Đang kiểm tra…",
+    "media.panel.introBefore": "Tải video từ YouTube, TikTok, Facebook, Instagram, X, Vimeo… bằng",
+    "media.panel.introAfter": ". ffmpeg ghép hình và tiếng (cần cho chất lượng trên 720p) và chuyển sang MP3.",
+    "media.installedVersion": "Đã cài · {version}",
+    "media.notInstalled": "Chưa cài",
+    "media.fromSystem": "Có sẵn trên máy",
+    "media.installed": "Đã cài",
+    "media.ffmpegManual": "Chưa có (cài bằng Homebrew / trình quản lý gói)",
+    "media.installWithSize": "Cài đặt ({size})",
+    "media.updateYtdlp": "Cập nhật yt-dlp",
+    "media.remove": "Gỡ công cụ",
+    "media.autoUpdate": "yt-dlp được tự cập nhật mỗi ngày, vì các trang video hay thay đổi cách phát.",
+  },
+  en: {
+    "media.step.ytdlp": "Downloading yt-dlp",
+    "media.step.ffmpeg": "Downloading ffmpeg",
+    "media.step.extract": "Extracting ffmpeg",
+    "media.step.update": "Updating yt-dlp",
+    "media.preparing": "Preparing…",
+
+    "media.card.title": "Video download tools required",
+    "media.card.before": "To download from YouTube, TikTok, Facebook…, the app uses",
+    "media.card.and": "and",
+    "media.card.after": "(open source). You only need to install them once",
+    "media.card.size": ", about {size}",
+    "media.card.end": ". The app keeps them up to date.",
+    "media.install": "Install",
+
+    "media.checking": "Checking…",
+    "media.panel.introBefore": "Download videos from YouTube, TikTok, Facebook, Instagram, X, Vimeo… with",
+    "media.panel.introAfter": ". ffmpeg merges video and audio (needed above 720p) and converts to MP3.",
+    "media.installedVersion": "Installed · {version}",
+    "media.notInstalled": "Not installed",
+    "media.fromSystem": "Available on this system",
+    "media.installed": "Installed",
+    "media.ffmpegManual": "Not found (install it with Homebrew / your package manager)",
+    "media.installWithSize": "Install ({size})",
+    "media.updateYtdlp": "Update yt-dlp",
+    "media.remove": "Remove tools",
+    "media.autoUpdate": "yt-dlp updates itself daily, because video sites often change how they serve videos.",
+  },
+});

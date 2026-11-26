@@ -21,6 +21,8 @@ pub struct AppSettings {
     pub confirm_captures: bool,
     /// Closing the window keeps the app running in the system tray.
     pub close_to_tray: bool,
+    /// UI language: "auto" (follow the OS), "vi" or "en".
+    pub language: String,
 }
 
 impl Default for AppSettings {
@@ -30,6 +32,7 @@ impl Default for AppSettings {
             bridge_port: DEFAULT_BRIDGE_PORT,
             confirm_captures: true,
             close_to_tray: true,
+            language: "auto".into(),
         }
     }
 }

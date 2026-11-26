@@ -4,11 +4,11 @@ import { fileKind, hostOf, KIND_COLORS, type FileKind } from "../lib/format";
 import { AreaChart, BarList, ColumnChart, type BarItem, type Column } from "./charts";
 import { TYPE_FILTERS } from "./Sidebar";
 import { FileIcon, GlobeIcon } from "./Icons";
+import { locale, useLang, useT } from "../i18n";
 
 const RANGES = [7, 30, 90] as const;
 type Range = (typeof RANGES)[number];
 const DAY = 86_400_000;
-const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 /** 1536 -> "1.5 KB": up to two decimals, trailing zeros dropped (axis-friendly). */
 export function compactBytes(v: number): string {
@@ -62,8 +62,11 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: number[] }) {
   const [range, setRange] = useState<Range>(30);
   const [asTable, setAsTable] = useState(false);
+  const t = useT();
+  const lang = useLang();
 
   const s = useMemo(() => {
+    const weekdays = t("stats.weekdays").split(",");
     const today = startOfDay(Date.now());
     const from = today - (range - 1) * DAY;
     const done = rows.filter((r) => r.status === "completed" && (r.completedAt ?? 0) >= from);
@@ -81,16 +84,18 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
     }
     const days: Column[] = [];
     for (let i = 0; i < range; i++) {
-      const t = from + i * DAY;
-      const d = new Date(t);
-      const e = perDay.get(dayKey(t));
-      const date = `${d.getDate()}/${d.getMonth() + 1}`;
+      const ms = from + i * DAY;
+      const d = new Date(ms);
+      const e = perDay.get(dayKey(ms));
+      // "26/11" in Vietnamese, "11/26" in English.
+      const date = d.toLocaleDateString(locale(lang), { day: "numeric", month: "numeric" });
+      const full = d.toLocaleDateString(locale(lang), { day: "numeric", month: "numeric", year: "numeric" });
       days.push({
-        key: dayKey(t),
-        label: range === 7 ? `${WEEKDAYS[d.getDay()]} ${date}` : date,
-        title: `${WEEKDAYS[d.getDay()]}, ${date}/${d.getFullYear()}`,
+        key: dayKey(ms),
+        label: range === 7 ? `${weekdays[d.getDay()]} ${date}` : date,
+        title: `${weekdays[d.getDay()]}, ${full}`,
         value: e?.bytes ?? 0,
-        detail: e ? `${e.files} tệp` : "không có tệp",
+        detail: e ? t("stats.files", { n: e.files }) : t("stats.noFiles"),
       });
     }
 
@@ -102,15 +107,15 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
       ek.bytes += sizeOf(r);
       ek.files += 1;
       byKind.set(k, ek);
-      const h = hostOf(r.url) || "khác";
+      const h = hostOf(r.url) || t("stats.otherHost");
       const eh = byHost.get(h) ?? { bytes: 0, files: 0 };
       eh.bytes += sizeOf(r);
       eh.files += 1;
       byHost.set(h, eh);
     }
-    const kindLabel = (k: FileKind) => TYPE_FILTERS.find((t) => t.key === k)?.label ?? "Khác";
+    const kindLabel = (k: FileKind) => t(TYPE_FILTERS.find((f) => f.key === k)?.label ?? "stats.kind.other");
     const kindIcon = (k: FileKind) => {
-      const Icon = TYPE_FILTERS.find((t) => t.key === k)?.icon ?? FileIcon;
+      const Icon = TYPE_FILTERS.find((f) => f.key === k)?.icon ?? FileIcon;
       return (
         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${KIND_COLORS[k]}`}>
           <Icon className="h-3.5 w-3.5" />
@@ -119,7 +124,7 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
     };
     const kinds: BarItem[] = [...byKind.entries()]
       .sort((a, b) => b[1].bytes - a[1].bytes)
-      .map(([k, e]) => ({ key: k, label: kindLabel(k), icon: kindIcon(k), value: e.bytes, detail: `${e.files} tệp` }));
+      .map(([k, e]) => ({ key: k, label: kindLabel(k), icon: kindIcon(k), value: e.bytes, detail: t("stats.files", { n: e.files }) }));
     const hosts: BarItem[] = [...byHost.entries()]
       .sort((a, b) => b[1].bytes - a[1].bytes)
       .slice(0, 6)
@@ -128,7 +133,7 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
         label: h,
         icon: <GlobeIcon className="h-3.5 w-3.5 shrink-0 text-faint" />,
         value: e.bytes,
-        detail: `${e.files} tệp`,
+        detail: t("stats.files", { n: e.files }),
       }));
 
     const largest = done.reduce<Row | null>((a, r) => (!a || sizeOf(r) > sizeOf(a) ? r : a), null);
@@ -145,20 +150,20 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
       kinds,
       hosts,
     };
-  }, [rows, range]);
+  }, [rows, range, t, lang]);
 
   const peak = Math.max(0, ...speedHistory);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <header className="px-5 pt-5 pb-3">
-        <h1 className="text-[20px] font-semibold tracking-tight">Thống kê</h1>
-        <p className="text-[12px] text-mute">Tính từ các lượt tải đang có trong danh sách. Lượt tải đã xóa không được tính.</p>
+        <h1 className="text-[20px] font-semibold tracking-tight">{t("stats.title")}</h1>
+        <p className="text-[12px] text-mute">{t("stats.subtitle")}</p>
       </header>
 
       {/* One filter row, scoping everything below (except the live speed card). */}
       <div className="px-5 pb-4">
-        <div className="inline-flex gap-1 rounded-lg bg-panel p-1" role="group" aria-label="Khoảng thời gian">
+        <div className="inline-flex gap-1 rounded-lg bg-panel p-1" role="group" aria-label={t("stats.rangeLabel")}>
           {RANGES.map((r) => (
             <button
               key={r}
@@ -166,7 +171,7 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
               aria-pressed={range === r}
               className={`rounded-md px-3 py-1 text-[12.5px] font-medium transition ${range === r ? "bg-card text-brand shadow-card" : "text-mute hover:text-ink"}`}
             >
-              {r} ngày
+              {t("stats.days", { n: r })}
             </button>
           ))}
         </div>
@@ -176,40 +181,41 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
         <div className="grid grid-cols-2 gap-3 @[900px]:grid-cols-[1.5fr_1fr_1fr_1fr]">
           {/* The page's one hero figure. */}
           <div className="card col-span-2 min-w-0 px-5 py-4 @[900px]:col-span-1">
-            <div className="text-[11.5px] text-mute">Đã tải về trong {range} ngày</div>
+            <div className="text-[11.5px] text-mute">{t("stats.downloadedIn", { n: range })}</div>
             <div className="mt-1 text-[48px] leading-none font-semibold tracking-tight text-ink">{compactBytes(s.bytes)}</div>
             <div className="mt-2 text-[12px] text-mute">
-              {s.files} tệp hoàn tất{s.activeDays ? ` trong ${s.activeDays} ngày có tải` : ""}
+              {t("stats.completedFiles", { n: s.files })}
+              {s.activeDays ? t("stats.activeDays", { n: s.activeDays }) : ""}
             </div>
           </div>
           <Tile
-            label="Tỉ lệ thành công"
+            label={t("stats.successRate")}
             value={s.successRate == null ? "—" : `${Math.round(s.successRate * 100)}%`}
-            sub={s.failed ? `${s.failed} lượt lỗi` : s.successRate == null ? "Chưa có dữ liệu" : "Không có lượt lỗi"}
+            sub={s.failed ? t("stats.failedCount", { n: s.failed }) : s.successRate == null ? t("stats.noData") : t("stats.noFailures")}
           />
-          <Tile label="Tệp lớn nhất" value={s.largest ? compactBytes(sizeOf(s.largest)) : "—"} sub={s.largest?.fileName} />
-          <Tile label="Trung bình mỗi ngày có tải" value={s.activeDays ? compactBytes(s.perActiveDay) : "—"} sub={s.activeDays ? `${s.activeDays} ngày` : undefined} />
+          <Tile label={t("stats.largest")} value={s.largest ? compactBytes(sizeOf(s.largest)) : "—"} sub={s.largest?.fileName} />
+          <Tile label={t("stats.perActiveDay")} value={s.activeDays ? compactBytes(s.perActiveDay) : "—"} sub={s.activeDays ? t("stats.days", { n: s.activeDays }) : undefined} />
         </div>
 
         <Card
-          title="Dung lượng tải theo ngày"
-          subtitle={`${range} ngày gần nhất, theo ngày hoàn tất`}
+          title={t("stats.perDay")}
+          subtitle={t("stats.perDaySub", { n: range })}
           action={
-            <button className="btn-ghost px-2.5 py-1 text-[12px]" onClick={() => setAsTable((t) => !t)} aria-pressed={asTable}>
-              {asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+            <button className="btn-ghost px-2.5 py-1 text-[12px]" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
+              {asTable ? t("stats.showChart") : t("stats.showTable")}
             </button>
           }
         >
           {s.files === 0 ? (
-            <p className="py-14 text-center text-[12.5px] text-mute">Chưa có lượt tải nào hoàn tất trong {range} ngày qua.</p>
+            <p className="py-14 text-center text-[12.5px] text-mute">{t("stats.noneCompleted", { n: range })}</p>
           ) : asTable ? (
             <div className="max-h-[240px] overflow-y-auto">
               <table className="w-full text-[12.5px]">
                 <thead className="sticky top-0 bg-card text-left text-[11.5px] text-mute">
                   <tr>
-                    <th className="py-1.5 font-medium">Ngày</th>
-                    <th className="py-1.5 text-right font-medium">Dung lượng</th>
-                    <th className="py-1.5 text-right font-medium">Số tệp</th>
+                    <th className="py-1.5 font-medium">{t("stats.colDate")}</th>
+                    <th className="py-1.5 text-right font-medium">{t("stats.colSize")}</th>
+                    <th className="py-1.5 text-right font-medium">{t("stats.colFiles")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line text-ink-2">
@@ -232,22 +238,22 @@ export function StatsPage({ rows, speedHistory }: { rows: Row[]; speedHistory: n
         </Card>
 
         <div className="grid grid-cols-1 gap-3 @[760px]:grid-cols-2">
-          <Card title="Theo loại tệp" subtitle="Dung lượng đã tải">
-            <BarList items={s.kinds} format={compactBytes} empty="Chưa có dữ liệu." />
+          <Card title={t("stats.byKind")} subtitle={t("stats.byKindSub")}>
+            <BarList items={s.kinds} format={compactBytes} empty={t("stats.noDataDot")} />
           </Card>
-          <Card title="Trang tải nhiều nhất" subtitle="Theo dung lượng, tối đa 6 trang">
-            <BarList items={s.hosts} format={compactBytes} empty="Chưa có dữ liệu." />
+          <Card title={t("stats.topHosts")} subtitle={t("stats.topHostsSub")}>
+            <BarList items={s.hosts} format={compactBytes} empty={t("stats.noDataDot")} />
           </Card>
         </div>
 
-        <Card title="Tốc độ tải" subtitle={`Trực tiếp · 60 giây qua${peak > 0 ? ` · cao nhất ${compactBytes(peak)}/s` : ""}`}>
+        <Card title={t("stats.speed")} subtitle={t("stats.speedSub") + (peak > 0 ? t("stats.speedPeak", { speed: compactBytes(peak) }) : "")}>
           <AreaChart
             values={speedHistory}
-            idle="Không có lượt tải nào đang chạy"
+            idle={t("stats.idle")}
             format={compactBytes}
             pointLabel={(i) => {
               const ago = speedHistory.length - 1 - i;
-              return ago === 0 ? "Bây giờ" : `${ago} giây trước`;
+              return ago === 0 ? t("stats.now") : t("stats.secondsAgo", { n: ago });
             }}
           />
         </Card>

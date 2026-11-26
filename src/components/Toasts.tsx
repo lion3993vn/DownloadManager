@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { AlertIcon, CheckCircleIcon, CloseIcon, InfoIcon } from "./Icons";
+import { useT } from "../i18n";
 
 export interface Toast {
   id: number;
@@ -32,6 +33,7 @@ const STYLE = {
 };
 
 export function Toasts({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: number) => void }) {
+  const tr = useT();
   return (
     <div className="pointer-events-none fixed right-5 bottom-5 z-[80] flex w-[340px] flex-col gap-2">
       {toasts.map((t) => {
@@ -54,7 +56,7 @@ export function Toasts({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: num
                 </button>
               )}
             </div>
-            <button className="icon-btn -mt-1 -mr-1 h-6 w-6" onClick={() => dismiss(t.id)} aria-label="Đóng">
+            <button className="icon-btn -mt-1 -mr-1 h-6 w-6" onClick={() => dismiss(t.id)} aria-label={tr("common.close")}>
               <CloseIcon className="h-3.5 w-3.5" />
             </button>
           </div>

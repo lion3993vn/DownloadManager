@@ -6,6 +6,9 @@ Các nhóm nên dùng: `### ✨ Tính năng mới`, `### 🔧 Cải tiến`, `##
 
 ## [Unreleased]
 
+### ✨ Tính năng mới
+- **Giao diện tiếng Anh.** App, menu khay hệ thống và extension có thêm tiếng Anh. App tự theo ngôn ngữ của hệ điều hành; đổi trong *Cài đặt → Giao diện → Ngôn ngữ*. Extension theo ngôn ngữ của trình duyệt.
+
 ## [0.5.1] - 2026-11-24
 
 ### 🔧 Cải tiến

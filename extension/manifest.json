@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "DownloadManager Connector",
+  "name": "__MSG_extName__",
   "version": "0.5.1",
-  "description": "Chuyển các lượt tải từ trình duyệt sang DownloadManager để tải đa luồng, nhanh hơn.",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "permissions": ["downloads", "cookies", "contextMenus", "storage", "webRequest", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {

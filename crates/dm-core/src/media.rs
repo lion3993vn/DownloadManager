@@ -273,14 +273,14 @@ fn qualities(info: &Value, has_ffmpeg: bool) -> (Vec<MediaQuality>, bool) {
     if out.is_empty() && !formats.is_empty() && audio_only.len() < formats.len() {
         out.push(MediaQuality {
             id: "best".into(),
-            label: "Tốt nhất".into(),
+            label: "Best".into(),
             estimated_size: None,
         });
     }
     if best_audio.is_some() || !formats.is_empty() {
         out.push(MediaQuality {
             id: "audio".into(),
-            label: if has_ffmpeg { "MP3" } else { "Âm thanh (M4A)" }.into(),
+            label: if has_ffmpeg { "MP3" } else { "Audio (M4A)" }.into(),
             estimated_size: best_audio.and_then(size_of),
         });
     }

@@ -6,6 +6,7 @@
 //! macOS and Linux get yt-dlp the same way but use the system ffmpeg
 //! (Homebrew / the distribution package) when there is one.
 
+use crate::i18n::tr;
 use crate::state::AppState;
 use dm_core::MediaTools;
 use futures_util::StreamExt;
@@ -273,7 +274,10 @@ fn extract_ffmpeg(zip_path: &Path, dest: &Path) -> Result<(), String> {
 /// Download yt-dlp (and ffmpeg where the app provides it).
 pub async fn install(app: &AppHandle) -> Result<ToolsStatus, String> {
     if BUSY.swap(true, Ordering::SeqCst) {
-        return Err("Đang cài đặt, hãy chờ một chút.".into());
+        return Err(tr!(
+            "Đang cài đặt, hãy chờ một chút.",
+            "Installing, please wait a moment."
+        ));
     }
     let result = install_inner(app).await;
     BUSY.store(false, Ordering::SeqCst);
@@ -283,7 +287,12 @@ pub async fn install(app: &AppHandle) -> Result<ToolsStatus, String> {
 }
 
 async fn install_inner(app: &AppHandle) -> Result<(), String> {
-    let asset = ytdlp_asset().ok_or("Hệ điều hành này chưa được hỗ trợ.")?;
+    let asset = ytdlp_asset().ok_or_else(|| {
+        tr!(
+            "Hệ điều hành này chưa được hỗ trợ.",
+            "This operating system is not supported yet."
+        )
+    })?;
     let dir = tools_dir(app).ok_or("no app data folder")?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let client = client()?;
@@ -357,9 +366,13 @@ fn remember_update(app: &AppHandle) {
 
 /// `yt-dlp -U`: the standalone binary replaces itself with the latest release.
 pub async fn update(app: &AppHandle) -> Result<ToolsStatus, String> {
-    let tools = detect(app).ok_or("yt-dlp chưa được cài.")?;
+    let tools =
+        detect(app).ok_or_else(|| tr!("yt-dlp chưa được cài.", "yt-dlp is not installed."))?;
     if BUSY.swap(true, Ordering::SeqCst) {
-        return Err("Đang cài đặt, hãy chờ một chút.".into());
+        return Err(tr!(
+            "Đang cài đặt, hãy chờ một chút.",
+            "Installing, please wait a moment."
+        ));
     }
     let _ = app.emit(
         "dm://tools-progress",
@@ -396,7 +409,10 @@ pub async fn update(app: &AppHandle) -> Result<ToolsStatus, String> {
 
 pub fn remove(app: &AppHandle) -> Result<(), String> {
     if BUSY.load(Ordering::SeqCst) {
-        return Err("Đang cài đặt, hãy chờ một chút.".into());
+        return Err(tr!(
+            "Đang cài đặt, hãy chờ một chút.",
+            "Installing, please wait a moment."
+        ));
     }
     if let Some(dir) = tools_dir(app) {
         let _ = std::fs::remove_dir_all(dir);

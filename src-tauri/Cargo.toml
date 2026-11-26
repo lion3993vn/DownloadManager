@@ -31,3 +31,4 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
 futures-util = { workspace = true }
 auto-launch = "0.6"
+sys-locale = "0.3"

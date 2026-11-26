@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { CloseIcon } from "./Icons";
+import { useT } from "../i18n";
 
 interface Props {
   title: ReactNode;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function Modal({ title, subtitle, icon, onClose, children, footer, width = "max-w-lg", flush, danger }: Props) {
+  const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -42,7 +44,7 @@ export function Modal({ title, subtitle, icon, onClose, children, footer, width 
             <h2 className="text-[16px] leading-6 font-semibold text-ink">{title}</h2>
             {subtitle && <p className="mt-0.5 text-[12.5px] text-mute">{subtitle}</p>}
           </div>
-          <button className="icon-btn -mt-1 -mr-2" onClick={onClose} aria-label="Đóng">
+          <button className="icon-btn -mt-1 -mr-2" onClick={onClose} aria-label={t("common.close")}>
             <CloseIcon />
           </button>
         </div>

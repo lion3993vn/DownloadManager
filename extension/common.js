@@ -20,6 +20,34 @@ const DM_DEFAULTS = {
   skipNext: false,
 };
 
+/**
+ * Translated text from _locales/<browser language>/messages.json (English
+ * otherwise). `subs` fill `$1`, `$2`… Falls back to the key.
+ */
+function dmT(key, ...subs) {
+  try {
+    return ext.i18n.getMessage(key, subs.map(String)) || key;
+  } catch {
+    return key;
+  }
+}
+
+/**
+ * Fills `data-i18n` (text), `data-i18n-html` (trusted markup from our own
+ * messages), `data-i18n-title`, `data-i18n-placeholder` and
+ * `data-i18n-aria-label` elements under `root`.
+ */
+function dmApplyI18n(root = document) {
+  if (root === document) document.documentElement.lang = ext.i18n.getUILanguage();
+  for (const el of root.querySelectorAll("[data-i18n]")) el.textContent = dmT(el.dataset.i18n);
+  for (const el of root.querySelectorAll("[data-i18n-html]")) el.innerHTML = dmT(el.dataset.i18nHtml);
+  for (const el of root.querySelectorAll("[data-i18n-title]")) el.title = dmT(el.dataset.i18nTitle);
+  for (const el of root.querySelectorAll("[data-i18n-placeholder]")) el.placeholder = dmT(el.dataset.i18nPlaceholder);
+  for (const el of root.querySelectorAll("[data-i18n-aria-label]")) {
+    el.setAttribute("aria-label", dmT(el.dataset.i18nAriaLabel));
+  }
+}
+
 async function dmSettings() {
   const stored = await ext.storage.local.get(null);
   return { ...DM_DEFAULTS, ...stored };

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { errorText, formatBytes, formatDate, formatEta, formatSpeed, hostOf, STATUS_LABEL, STATUS_PILL } from "../lib/format";
+import { errorText, formatBytes, formatDate, formatEta, formatSpeed, hostOf, statusLabel, STATUS_PILL } from "../lib/format";
 import type { Row } from "../lib/useDownloads";
+import { useT } from "../i18n";
 import { FileTile } from "./FileTile";
 import { SegmentBar, SegmentMap } from "./SegmentBar";
 import { CloseIcon, CopyIcon, FolderIcon, OpenIcon, PauseIcon, PlayIcon, RetryIcon, StopIcon, TrashIcon } from "./Icons";
@@ -26,6 +27,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function DetailsPanel({ row: r, ...a }: Props) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const pct = r.status === "completed" ? 100 : r.totalSize ? Math.min(100, (r.downloaded / r.totalSize) * 100) : null;
   const sep = r.saveDir.includes("\\") ? "\\" : "/";
@@ -43,8 +45,8 @@ export function DetailsPanel({ row: r, ...a }: Props) {
   return (
     <aside className="animate-fade-in flex w-[320px] shrink-0 flex-col border-l border-line bg-card">
       <div className="flex items-center justify-between px-5 pt-4">
-        <span className="text-[12px] font-semibold tracking-wider text-faint uppercase">Chi tiết</span>
-        <button className="icon-btn" onClick={a.onClose} aria-label="Đóng chi tiết">
+        <span className="text-[12px] font-semibold tracking-wider text-faint uppercase">{t("details.title")}</span>
+        <button className="icon-btn" onClick={a.onClose} aria-label={t("details.close")}>
           <CloseIcon />
         </button>
       </div>
@@ -53,7 +55,7 @@ export function DetailsPanel({ row: r, ...a }: Props) {
         <div className="mt-3 flex flex-col items-center text-center">
           <FileTile name={r.fileName} size="lg" />
           <h3 className="mt-3 text-[14px] font-semibold break-all text-ink">{r.fileName}</h3>
-          <span className={`mt-2 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
+          <span className={`mt-2 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STATUS_PILL[r.status]}`}>{statusLabel(r.status)}</span>
         </div>
 
         <div className="mt-5">
@@ -69,43 +71,43 @@ export function DetailsPanel({ row: r, ...a }: Props) {
         <div className="mt-4 grid grid-cols-2 gap-2">
           {(r.status === "downloading" || r.status === "queued") && (
             <button className="btn-outline" onClick={a.onPause}>
-              <PauseIcon /> Tạm dừng
+              <PauseIcon /> {t("details.pause")}
             </button>
           )}
           {r.status === "paused" && (
             <button className="btn-primary" onClick={a.onResume}>
-              <PlayIcon /> Tiếp tục
+              <PlayIcon /> {t("details.resume")}
             </button>
           )}
           {(r.status === "failed" || r.status === "canceled") && (
             <button className="btn-primary" onClick={a.onResume}>
-              <RetryIcon /> Tải lại
+              <RetryIcon /> {t("details.retry")}
             </button>
           )}
           {r.status === "completed" && (
             <button className="btn-primary" onClick={a.onOpen}>
-              <OpenIcon /> Mở tệp
+              <OpenIcon /> {t("details.openFile")}
             </button>
           )}
           <button className="btn-outline" onClick={a.onFolder}>
-            <FolderIcon /> Thư mục
+            <FolderIcon /> {t("details.folder")}
           </button>
           {r.status !== "completed" && r.status !== "canceled" && (
             <button className="btn-outline" onClick={a.onCancel}>
-              <StopIcon /> Hủy tải
+              <StopIcon /> {t("details.cancel")}
             </button>
           )}
           <button className="btn-outline text-red-600 hover:text-red-600" onClick={a.onRemove}>
-            <TrashIcon /> Xóa
+            <TrashIcon /> {t("details.remove")}
           </button>
         </div>
 
         {r.status !== "completed" && mapSegments.length > 1 && (
           <section className="mt-5">
             <h4 className="mb-2 text-[12px] font-semibold text-ink-2">
-              Các luồng tải{" "}
+              {t("details.connectionsHeading")}{" "}
               <span className="font-normal text-mute">
-                ({mapSegments.length} {r.kind === "media" ? "đoạn đang tải" : "đoạn"})
+                ({t(r.kind === "media" ? "details.activeSegments" : "details.segments", { n: mapSegments.length })})
               </span>
             </h4>
             <SegmentMap segments={mapSegments} status={r.status} />
@@ -113,50 +115,52 @@ export function DetailsPanel({ row: r, ...a }: Props) {
         )}
 
         <dl className="mt-5 divide-y divide-line text-[12.5px]">
-          <InfoRow label="Kích thước">
+          <InfoRow label={t("details.size")}>
             {/* HLS sizes are estimates until every segment is in. */}
             {r.kind === "hls" && r.status !== "completed" && r.totalSize != null ? "≈ " : ""}
             {formatBytes(r.totalSize)}
           </InfoRow>
-          <InfoRow label="Đã tải">{formatBytes(r.status === "completed" ? (r.totalSize ?? r.downloaded) : r.downloaded)}</InfoRow>
-          {r.status === "downloading" && <InfoRow label="Còn lại">{formatEta(r.etaSecs)}</InfoRow>}
-          {r.kind === "hls" && <InfoRow label="Loại">Video HLS (ghép từ nhiều đoạn)</InfoRow>}
+          <InfoRow label={t("details.downloaded")}>{formatBytes(r.status === "completed" ? (r.totalSize ?? r.downloaded) : r.downloaded)}</InfoRow>
+          {r.status === "downloading" && <InfoRow label={t("details.remaining")}>{formatEta(r.etaSecs)}</InfoRow>}
+          {r.kind === "hls" && <InfoRow label={t("details.type")}>{t("details.typeHls")}</InfoRow>}
           {r.kind === "media" && (
-            <InfoRow label="Loại">
-              Video từ {hostOf(r.url)} (yt-dlp)
-              {r.mediaQuality ? ` · ${r.mediaQuality === "audio" ? "chỉ âm thanh" : r.mediaQuality === "best" ? "tốt nhất" : `${r.mediaQuality}p`}` : ""}
+            <InfoRow label={t("details.type")}>
+              {t("details.typeMedia", { host: hostOf(r.url) })}
+              {r.mediaQuality
+                ? ` · ${r.mediaQuality === "audio" ? t("details.qualityAudio") : r.mediaQuality === "best" ? t("details.qualityBest") : `${r.mediaQuality}p`}`
+                : ""}
             </InfoRow>
           )}
-          <InfoRow label="Kết nối">
+          <InfoRow label={t("details.connections")}>
             {r.kind === "media"
               ? // yt-dlp only splits some formats (YouTube's); the live count says.
                 r.status === "downloading" && r.activeConnections > 0
-                ? `${r.activeConnections} luồng · hỗ trợ tạm dừng`
-                : "Hỗ trợ tạm dừng"
+                ? t("details.connResumable", { n: r.activeConnections })
+                : t("details.resumable")
               : r.kind === "hls"
-              ? `${r.connections} luồng · hỗ trợ tạm dừng`
+              ? t("details.connResumable", { n: r.connections })
               : r.totalSize == null && r.downloaded === 0 && r.status !== "completed"
-              ? `${r.connections} luồng (chưa kiểm tra máy chủ)`
+              ? t("details.connUnchecked", { n: r.connections })
               : r.resumable
-                ? `${r.connections} luồng · hỗ trợ tạm dừng`
-                : "1 luồng · không tạm dừng được"}
+                ? t("details.connResumable", { n: r.connections })
+                : t("details.singleConn")}
           </InfoRow>
-          <InfoRow label="Lưu tại">
+          <InfoRow label={t("details.savedAt")}>
             <span className="break-all" title={r.saveDir + sep + r.fileName}>
               {r.saveDir}
               {sep}
               <b className="font-medium text-ink">{r.fileName}</b>
             </span>
           </InfoRow>
-          <InfoRow label="Thêm lúc">{formatDate(r.createdAt)}</InfoRow>
-          {r.completedAt && <InfoRow label="Xong lúc">{formatDate(r.completedAt)}</InfoRow>}
+          <InfoRow label={t("details.addedAt")}>{formatDate(r.createdAt)}</InfoRow>
+          {r.completedAt && <InfoRow label={t("details.completedAt")}>{formatDate(r.completedAt)}</InfoRow>}
         </dl>
 
         <div className="mt-4">
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[12px] text-mute">Liên kết</span>
+            <span className="text-[12px] text-mute">{t("details.link")}</span>
             <button className="flex items-center gap-1 text-[12px] text-brand hover:underline" onClick={copyUrl}>
-              <CopyIcon className="h-3.5 w-3.5" /> {copied ? "Đã chép" : "Chép"}
+              <CopyIcon className="h-3.5 w-3.5" /> {copied ? t("common.copied") : t("common.copy")}
             </button>
           </div>
           <p className="rounded-lg bg-panel px-3 py-2 font-mono text-[11px] break-all text-ink-2 select-text">{r.url}</p>

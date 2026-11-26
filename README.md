@@ -1,110 +1,129 @@
+<div align="center">
+
+<img src="src-tauri/icons/128x128.png" width="96" alt="DownloadManager logo">
+
 # DownloadManager
 
-Trình quản lý tải xuống đa nền tảng (Windows / macOS / Linux) kiểu IDM:
+**A free, open-source download manager and download accelerator for Windows, macOS and Linux.**
+Splits every file into parallel connections, resumes after crashes, downloads videos from YouTube, TikTok and 1,000+ sites, and catches downloads straight from Chrome, Edge and Firefox. A lightweight IDM alternative built with Rust and Tauri.
 
-- **Tải đa luồng**: chia tệp thành nhiều đoạn (HTTP Range) và tải song song tối đa 32 kết nối.
-- **Work-stealing**: kết nối nào xong sớm sẽ "cướp" nửa sau của đoạn còn lại lớn nhất, nên không bị kẹt ở đoạn chậm cuối cùng.
-- **Tự thích nghi**: máy chủ trả 429/503 (giới hạn kết nối) → tự giảm số luồng; máy chủ không hỗ trợ / từ chối Range → tự chuyển về 1 luồng.
-- **Tạm dừng / tiếp tục**, kể cả sau khi tắt app hoặc crash (tiến độ lưu SQLite mỗi giây). Nếu tệp trên máy chủ đổi (ETag/Last-Modified/kích thước) thì tải lại từ đầu.
-- **Bắt download từ trình duyệt** qua extension Chrome / Edge / Firefox, giữ nguyên cookie, referrer, user-agent.
-- Hàng đợi, giới hạn tốc độ toàn cục, chạy nền ở khay hệ thống.
+[![Latest release](https://img.shields.io/github/v/release/lion3993vn/DownloadManager?label=download&sort=semver)](https://github.com/lion3993vn/DownloadManager/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/lion3993vn/DownloadManager/total)](https://github.com/lion3993vn/DownloadManager/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/lion3993vn/DownloadManager/build.yml?branch=main)](https://github.com/lion3993vn/DownloadManager/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## Kiến trúc
+**English** · [Tiếng Việt](README.vi.md)
+
+[**⬇ Download for Windows / macOS / Linux**](https://github.com/lion3993vn/DownloadManager/releases/latest)
+
+</div>
+
+## Features
+
+- **Multi-connection downloads.** Each file is split into segments fetched in parallel over HTTP Range requests, up to 32 connections per file.
+- **Work stealing.** A connection that finishes early takes over half of the largest remaining segment, so a download never crawls on one slow last piece.
+- **Adapts to the server.** On 429/503 (too many connections) it drops connections by itself; servers without Range support fall back to a single stream.
+- **Pause and resume**, even after closing the app or a crash: progress is saved to SQLite every second. If the file changed on the server (ETag, Last-Modified or size), it starts over instead of producing a corrupt file.
+- **Video downloader.** Paste a YouTube, TikTok, Facebook, Instagram, X (Twitter), Vimeo, Bilibili, Twitch, SoundCloud or Douyin link (and any other site [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports). Pick the quality (4K, 1080p, 720p…) or MP3 audio. yt-dlp and ffmpeg are installed from inside the app in one click.
+- **HLS / m3u8 streams** are downloaded in parallel, including AES-128 encrypted and fMP4 playlists, with no ffmpeg needed.
+- **Browser integration.** An extension for Chrome, Edge, Brave, Opera, Vivaldi, Cốc Cốc and Firefox hands downloads to the app with their cookies, referrer and user agent, and adds a "Download video" button on video pages.
+- Queue, global speed limit, statistics page, light and dark themes, system tray, start with the system.
+- English and Vietnamese interface (follows the system language; change it in *Settings*).
+
+## Install
+
+Get the installer from [GitHub Releases](https://github.com/lion3993vn/DownloadManager/releases/latest):
+
+| Platform | File |
+| --- | --- |
+| Windows 10/11 | `DownloadManager_x.y.z_x64-setup.exe` (recommended: per-user install, no admin rights) or `.msi` |
+| macOS (Apple Silicon / Intel) | `.dmg` |
+| Linux | `.deb` or `.AppImage` |
+
+The app updates itself: it checks for a new version at startup and every 6 hours. Updates are signed, and unfinished downloads continue after the restart.
+
+## Connect your browser
+
+The installer ships the browser extension. Open the app and click **Connect browser** (the card at the bottom of the sidebar; it also opens on first launch). The app:
+
+1. Unpacks the extension to a fixed folder and **writes the pairing code into it**, so there is nothing to type.
+2. Detects your browsers (Chrome, Edge, Cốc Cốc, Brave, Opera, Vivaldi, Firefox).
+3. **Open <browser>** opens a new window on your last used profile and copies `chrome://extensions` to the clipboard: paste it into the address bar.
+4. Turn on *Developer mode* → *Load unpacked* → paste the folder path (the **Copy** button in the app).
+5. The app notices when the extension connects.
+
+> Why not a fully automatic install? Chrome and Edge block other programs from installing extensions that are not in their stores (and from opening `chrome://` pages from the command line); Firefox only installs extensions signed by Mozilla. One-click install needs store listings on the Chrome Web Store, Edge Add-ons and AMO.
+
+The extension takes over downloads by file type (zip, exe, iso, mp4, pdf…) or size (over 20 MB by default; change it in the extension options). Right-click any link → *Download with DownloadManager* to send it to the app.
+
+## How it works
 
 ```
-crates/dm-core   Engine Rust thuần (tokio + reqwest): probe, chia đoạn, worker, work-stealing,
-                 resume, rate-limit, SQLite. Không phụ thuộc Tauri.
-crates/dm-cli    CLI để test/benchmark engine.
-src-tauri        App Tauri 2: commands cho UI, cầu nối HTTP cho extension (127.0.0.1:47890), tray.
-src              Giao diện React + TypeScript + Tailwind.
-extension        Extension Manifest V3 (dùng chung Chromium + Firefox).
+crates/dm-core   Pure Rust engine (tokio + reqwest): probing, segmenting, workers, work stealing,
+                 resume, rate limiting, HLS, yt-dlp integration, SQLite. No Tauri dependency.
+crates/dm-cli    Command-line tool to test and benchmark the engine.
+src-tauri        Tauri 2 app: commands for the UI, HTTP bridge for the extension (127.0.0.1:47890), tray.
+src              React + TypeScript + Tailwind interface.
+extension        Manifest V3 extension (shared by Chromium browsers and Firefox).
 ```
 
-Luồng bắt download:
+Capturing a browser download:
 
 ```
-Trình duyệt ──downloads.onCreated──▶ extension ──POST /api/capture (X-DM-Token)──▶ app
-                 (tạm dừng tải)          │                                        │
-                                         └─ app không chạy → trình duyệt tải tiếp   └─ hộp thoại xác nhận → engine
+Browser ──downloads.onCreated──▶ extension ──POST /api/capture (X-DM-Token)──▶ app
+            (download paused)        │                                         │
+                                     └─ app not running → the browser goes on   └─ confirm dialog → engine
 ```
 
-Bảo mật cầu nối: chỉ bind `127.0.0.1`; request có `Origin` của trang web bị chặn (403); bắt tải cần mã ghép cặp (401 nếu sai). Ghép cặp tự động yêu cầu người dùng bấm "Cho phép" trong app.
+Bridge security: it only binds `127.0.0.1`; requests carrying a web page `Origin` are rejected (403); captures require the pairing token (401 otherwise). Pairing asks you to click "Allow" in the app.
 
-## Phát triển
+## Build from source
 
-Yêu cầu: Rust stable, Node 22+, pnpm 10. Windows cần MSVC C++ build tools + WebView2; Linux cần `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`.
+Requirements: Rust stable, Node 22+, pnpm 10. Windows needs the MSVC C++ build tools and WebView2; Linux needs `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`.
 
 ```bash
 pnpm install
-pnpm tauri dev          # chạy app
-cargo test -p dm-core   # test engine (server giả lập: Range, không Range, ngắt kết nối, 429, đổi ETag…)
-pnpm tauri build        # tạo bộ cài (.msi/.exe, .dmg, .deb/.AppImage) — cần khoá ký, xem bên dưới
-pnpm pack:extension     # đóng gói extension → dist-extension/*.zip
+pnpm tauri dev          # run the app
+cargo test -p dm-core   # engine tests (fake server: Range, no Range, dropped connections, 429, changed ETag…)
+pnpm tauri build        # installers (.msi/.exe, .dmg, .deb/.AppImage)
+pnpm pack:extension     # zip the extension → dist-extension/*.zip
 ```
 
-CLI benchmark:
+Benchmark the engine without the UI:
 
 ```bash
 cargo run --release -p dm-cli -- https://example.com/big.iso -c 8 -o ./out
 ```
 
-> Mẹo (Windows + OneDrive): đặt `CARGO_TARGET_DIR` ra ngoài thư mục đồng bộ để OneDrive không phải sync vài GB file build.
+> Tip (Windows + OneDrive): point `CARGO_TARGET_DIR` outside the synced folder so OneDrive does not sync gigabytes of build output.
 
-## Cài đặt
+### Signed updates
 
-Tải bộ cài từ GitHub Releases (hoặc tự build bằng `pnpm tauri build`):
+Updates are signed with minisign, and the app only installs a build whose signature matches the public key in `tauri.conf.json` (`plugins.updater`).
 
-- **Windows**: `DownloadManager_x.y.z_x64-setup.exe` (khuyên dùng, giao diện tiếng Việt, cài cho người dùng hiện tại, không cần quyền admin) hoặc `.msi`.
-- **macOS**: `.dmg` · **Linux**: `.deb` / `.AppImage`.
+- **CI**: the repository secret `TAURI_SIGNING_PRIVATE_KEY` holds the private key. Each `v*` tag produces a release with `.sig` files and `latest.json` (updater endpoint: `releases/latest/download/latest.json`).
+- **Local**: `TAURI_SIGNING_PRIVATE_KEY=<path or key> TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build`.
+- **Do not lose the private key.** Without it, installed copies can no longer receive updates.
 
-Bộ cài đã kèm sẵn extension trình duyệt.
+### Releasing
 
-## Kết nối trình duyệt (cài extension ngay trong app)
+1. While working, record changes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+2. Run `pnpm release 0.6.0` (`--dry-run` to preview). It bumps every version file, turns `[Unreleased]` into the version, commits, tags, pushes, and creates a draft release with your `gh` login.
+3. CI builds and signs Windows/macOS/Linux, attaches the installers, the extension and `latest.json`, writes the release notes and publishes. Running apps see the update within 6 hours.
 
-Mở app → **Kết nối trình duyệt** (thẻ ở góc dưới sidebar, hoặc tự mở ở lần chạy đầu). App sẽ:
+Full procedure: [docs/RELEASING.md](docs/RELEASING.md).
 
-1. Giải nén extension ra thư mục cố định và **tự ghi mã ghép cặp vào extension** → không phải nhập mã.
-2. Phát hiện các trình duyệt có trên máy (Chrome, Edge, Cốc Cốc, Brave, Opera, Vivaldi, Firefox).
-3. Bấm **Mở <trình duyệt>**: mở cửa sổ mới ở profile dùng gần nhất và chép sẵn địa chỉ `chrome://extensions` → dán vào thanh địa chỉ.
-4. Bật *Developer mode* → *Load unpacked* → dán đường dẫn thư mục (nút **Chép** trong app).
-5. App tự nhận biết khi extension kết nối thành công.
+### Translations
 
-> Vì sao không cài tự động hoàn toàn? Chrome/Edge chặn phần mềm bên ngoài cài extension không có trên Store (và chặn mở `chrome://` từ dòng lệnh); Firefox bắt buộc extension được Mozilla ký. Muốn cài 1 chạm cần đăng extension lên Chrome Web Store / Edge Add-ons / AMO.
+UI strings live in [`src/i18n/messages/`](src/i18n/messages) (Vietnamese and English side by side; TypeScript rejects a missing translation) and the extension's in [`extension/_locales/`](extension/_locales). Pull requests for new languages are welcome.
 
-Extension bắt các tệp theo đuôi (zip, exe, iso, mp4, pdf, …) hoặc lớn hơn 20 MB (chỉnh trong tùy chọn extension). Chuột phải vào liên kết → *Tải bằng DownloadManager* để tải bất kỳ link nào.
+## Limitations
 
-## Cập nhật tự động & nhật ký thay đổi
+- Not supported yet: playlists and live streams on video sites, HLS with separate audio when not going through yt-dlp, DRM-protected video, FTP and BitTorrent.
+- Downloads in incognito / private windows are not captured.
+- Firefox only loads the extension temporarily (removed when Firefox closes) until it is signed by Mozilla.
+- Single-stream downloads (servers without Range support) cannot be paused and resumed: resuming starts over.
 
-Bấm số phiên bản ở góc dưới sidebar (hoặc *Cài đặt → Giới thiệu*) để xem nhật ký thay đổi của mọi phiên bản (lấy từ GitHub Releases). App tự kiểm tra bản mới lúc khởi động và mỗi 6 giờ. Khi có bản mới, chỉ cần bấm **Cập nhật & khởi động lại**. Lượt tải đang dở sẽ tự tiếp tục sau khi khởi động lại.
+## License
 
-Bản cập nhật được ký bằng minisign và app chỉ cài bản có chữ ký khớp với public key trong `tauri.conf.json` (`plugins.updater`). Để build:
-
-- **CI**: secret `TAURI_SIGNING_PRIVATE_KEY` của repo chứa private key. Mỗi tag `v*` tạo release kèm file `.sig` và `latest.json` (endpoint updater: `releases/latest/download/latest.json`).
-- **Local**: `TAURI_SIGNING_PRIVATE_KEY=<đường dẫn hoặc nội dung key> TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build`.
-- **Đừng làm mất private key.** Mất key thì các bản đã cài không nhận được cập nhật nữa.
-
-## Phát hành phiên bản mới
-
-1. Trong lúc làm, ghi thay đổi vào mục `## [Unreleased]` của [CHANGELOG.md](CHANGELOG.md) (nhóm `### ✨ Tính năng mới` / `### 🔧 Cải tiến` / `### 🐛 Sửa lỗi`).
-2. Chạy `pnpm release 0.4.0` (thêm `--dry-run` để xem trước). Script sẽ:
-   - kiểm tra đang ở `main` và không còn thay đổi chưa commit;
-   - nâng version ở `Cargo.toml`, `package.json`, `tauri.conf.json`, `extension/manifest.json`;
-   - chuyển `[Unreleased]` thành `[0.4.0]`;
-   - commit, tạo tag `v0.4.0` và push;
-   - tạo release nháp bằng tài khoản `gh` của bạn. Cần `gh auth login`, vì GitHub không cho token của CI tự tạo release ở repo này.
-3. CI tự làm phần còn lại:
-   - build Windows/macOS/Linux, ký các bản cập nhật;
-   - đính kèm bộ cài, extension và `latest.json`;
-   - ghép mô tả release từ changelog + [mẫu](.github/release-template.md) (bảng tải về, lưu ý, SHA-256);
-   - **publish**.
-
-   Các app đang chạy sẽ thấy bản mới trong vòng 6 giờ, hoặc ngay khi khởi động lại.
-
-Hướng dẫn đầy đủ (chọn số phiên bản, việc cần kiểm tra trước khi phát hành, theo dõi CI, xử lý sự cố): [docs/RELEASING.md](docs/RELEASING.md).
-
-## Giới hạn hiện tại
-
-- Chưa hỗ trợ: danh sách phát và luồng phát trực tiếp trên các trang video, HLS tách riêng tiếng/hình khi không qua yt-dlp, video có DRM, FTP/BitTorrent.
-- Không bắt download trong cửa sổ ẩn danh.
-- Firefox chỉ cài được extension dạng tạm thời (tự gỡ khi đóng Firefox) cho tới khi extension được Mozilla ký.
-- Tải theo kiểu một luồng (máy chủ không hỗ trợ Range) không tạm dừng/tiếp tục được — tiếp tục sẽ tải lại từ đầu.
+[MIT](LICENSE)

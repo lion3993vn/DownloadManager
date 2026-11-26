@@ -136,6 +136,8 @@ export interface AppSettings {
   bridgePort: number;
   confirmCaptures: boolean;
   closeToTray: boolean;
+  /** UI language preference: "auto" (follow the OS), "vi" or "en". */
+  language: string;
 }
 
 export interface Settings {

@@ -2,6 +2,7 @@ mod autostart;
 mod bridge;
 mod commands;
 mod extension_setup;
+mod i18n;
 mod media_tools;
 mod state;
 mod tray;
@@ -30,7 +31,9 @@ pub fn run() {
                 Engine::open_with_media_tools(&db_path, tools)
             })?;
             forward_events(app.handle().clone(), engine.clone());
-            app.manage(AppState::new(engine));
+            let state = AppState::new(engine);
+            i18n::set_preference(&state.app_settings().language);
+            app.manage(state);
             // Refresh the unpacked extension (new version + current pairing token).
             if let Err(e) = extension_setup::prepare(app.handle()) {
                 tracing::warn!(error = %e, "could not prepare browser extension");

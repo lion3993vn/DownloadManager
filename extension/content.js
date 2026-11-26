@@ -8,6 +8,14 @@
   window.__dmVideoButton = true;
 
   const ext = globalThis.browser ?? globalThis.chrome;
+  // Content scripts do not load common.js (dmT); same lookup, inlined.
+  const tr = (key) => {
+    try {
+      return ext.i18n.getMessage(key) || key;
+    } catch {
+      return key; // extension reloaded: the old context is gone
+    }
+  };
   const MIN_W = 200;
   const MIN_H = 120;
   const HIDE_DELAY = 1200;
@@ -61,7 +69,7 @@
       </style>
       <button type="button" part="button">
         <svg viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
-        <span class="text"><span class="label">Tải video</span><span class="sub"></span></span>
+        <span class="text"><span class="label"></span><span class="sub"></span></span>
       </button>`;
     btn = root.querySelector("button");
     labelEl = root.querySelector(".label");
@@ -290,7 +298,7 @@
     current = video;
     state = "idle";
     btn.className = "";
-    labelEl.textContent = "Tải video";
+    labelEl.textContent = tr("videoButton");
     subEl.textContent = result.label || "";
     host.style.display = "block";
     place();
@@ -344,7 +352,7 @@
     if (!current || state === "busy") return;
     state = "busy";
     btn.className = "show busy";
-    labelEl.textContent = "Đang gửi…";
+    labelEl.textContent = tr("sending");
     let res = null;
     try {
       res = await ext.runtime.sendMessage({
@@ -358,12 +366,12 @@
     state = "done";
     if (res && res.ok) {
       btn.className = "show ok";
-      labelEl.textContent = "Đã gửi sang app";
+      labelEl.textContent = tr("sentToApp");
       subEl.textContent = "";
     } else {
       btn.className = "show err";
-      labelEl.textContent = "Không gửi được";
-      subEl.textContent = (res && res.error) || "Hãy mở DownloadManager";
+      labelEl.textContent = tr("sendFailed");
+      subEl.textContent = (res && res.error) || tr("openApp");
     }
     setTimeout(() => {
       state = "idle";

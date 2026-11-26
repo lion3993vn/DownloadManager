@@ -1,4 +1,5 @@
 import type { Status } from "./api";
+import { locale, t, type MessageKey } from "../i18n";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
 
@@ -23,15 +24,15 @@ export function formatEta(secs: number | null | undefined): string {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = Math.floor(secs % 60);
-  if (h > 99) return "> 99 giờ";
-  if (h > 0) return `${h} giờ ${m} phút`;
-  if (m > 0) return `${m} phút ${s}s`;
-  return `${s} giây`;
+  if (h > 99) return t("time.over99h");
+  if (h > 0) return t("time.hm", { h, m });
+  if (m > 0) return t("time.ms", { m, s });
+  return t("time.s", { s });
 }
 
 export function formatDate(ms: number | null | undefined): string {
   if (!ms) return "—";
-  return new Date(ms).toLocaleString("vi-VN", {
+  return new Date(ms).toLocaleString(locale(), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -43,11 +44,11 @@ export function formatDate(ms: number | null | undefined): string {
 export function formatRelative(ms: number | null | undefined): string {
   if (!ms) return "—";
   const diff = (Date.now() - ms) / 1000;
-  if (diff < 60) return "vừa xong";
-  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} ngày trước`;
-  return new Date(ms).toLocaleDateString("vi-VN");
+  if (diff < 60) return t("time.justNow");
+  if (diff < 3600) return t("time.minutesAgo", { n: Math.floor(diff / 60) });
+  if (diff < 86400) return t("time.hoursAgo", { n: Math.floor(diff / 3600) });
+  if (diff < 86400 * 7) return t("time.daysAgo", { n: Math.floor(diff / 86400) });
+  return new Date(ms).toLocaleDateString(locale());
 }
 
 export function hostOf(url: string): string {
@@ -93,14 +94,9 @@ export const KIND_COLORS: Record<FileKind, string> = {
   other: "bg-slate-500/12 text-slate-600 dark:text-slate-400",
 };
 
-export const STATUS_LABEL: Record<Status, string> = {
-  queued: "Đang chờ",
-  downloading: "Đang tải",
-  paused: "Tạm dừng",
-  completed: "Hoàn tất",
-  failed: "Lỗi",
-  canceled: "Đã hủy",
-};
+export function statusLabel(status: Status): string {
+  return t(`status.${status}`);
+}
 
 export const STATUS_PILL: Record<Status, string> = {
   queued: "bg-slate-500/12 text-slate-600 dark:text-slate-300",
@@ -134,26 +130,26 @@ export function resolutionLabel(res: [number, number] | null | undefined): strin
 }
 
 /** Engine errors are English; translate the ones users can act on. */
-const ERROR_TEXT: [RegExp, string][] = [
-  [/live streams cannot be downloaded/i, "Đây là luồng phát trực tiếp, không tải được."],
-  [/protected with .*\(DRM\)/i, "Video được bảo vệ bản quyền (DRM), không tải được."],
-  [/audio is a separate stream/i, "Video này tách riêng tiếng và hình, chưa được hỗ trợ."],
-  [/not an HLS playlist/i, "Liên kết không phải danh sách phát HLS hợp lệ."],
-  [/could not decrypt a segment/i, "Không giải mã được video (sai khóa?)."],
-  [/media tools/i, "Cần cài công cụ tải video (yt-dlp): Cài đặt → Video."],
-  [/this link is a playlist/i, "Đây là danh sách phát. Hãy mở một video cụ thể rồi tải."],
-  [/yt-dlp: .*(Private video|This video is private)/i, "Video riêng tư, không tải được."],
-  [/yt-dlp: .*(Sign in to confirm|confirm your age|age-restricted)/i, "Video yêu cầu đăng nhập hoặc xác nhận tuổi."],
-  [/yt-dlp: .*Fresh cookies/i, "Trang này chặn công cụ tải video. Với Douyin: mở video trên douyin.com, đợi video phát rồi bấm nút “Tải video” trên video (cần extension bản mới)."],
-  [/yt-dlp: .*(Video unavailable|not available)/i, "Video không còn hoặc không xem được ở khu vực này."],
-  [/yt-dlp: .*Unsupported URL/i, "Trang này không có video tải được."],
-  [/server responded with HTTP 403/i, "Máy chủ từ chối truy cập (HTTP 403). Liên kết có thể đã hết hạn."],
+const ERROR_TEXT: [RegExp, MessageKey][] = [
+  [/live streams cannot be downloaded/i, "error.live"],
+  [/protected with .*\(DRM\)/i, "error.drm"],
+  [/audio is a separate stream/i, "error.splitAudio"],
+  [/not an HLS playlist/i, "error.notHls"],
+  [/could not decrypt a segment/i, "error.decrypt"],
+  [/media tools/i, "error.mediaTools"],
+  [/this link is a playlist/i, "error.playlist"],
+  [/yt-dlp: .*(Private video|This video is private)/i, "error.private"],
+  [/yt-dlp: .*(Sign in to confirm|confirm your age|age-restricted)/i, "error.signIn"],
+  [/yt-dlp: .*Fresh cookies/i, "error.freshCookies"],
+  [/yt-dlp: .*(Video unavailable|not available)/i, "error.unavailable"],
+  [/yt-dlp: .*Unsupported URL/i, "error.unsupported"],
+  [/server responded with HTTP 403/i, "error.forbidden"],
 ];
 
 export function errorText(message: string | null | undefined): string {
   if (!message) return "";
-  for (const [re, text] of ERROR_TEXT) if (re.test(message)) return text;
+  for (const [re, key] of ERROR_TEXT) if (re.test(message)) return t(key);
   const yt = /^yt-dlp: (.*)/s.exec(message);
-  if (yt) return `Không tải được video: ${yt[1]}`;
+  if (yt) return t("error.video", { msg: yt[1] });
   return message;
 }

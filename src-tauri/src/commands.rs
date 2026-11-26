@@ -2,6 +2,7 @@
 
 use crate::autostart;
 use crate::extension_setup::{self, ExtensionSetupInfo};
+use crate::i18n::{self, tr};
 use crate::state::{
     new_token, AppSettings, AppState, BridgeStatus, Capture, ConnectedExtension, PairRequest,
 };
@@ -79,7 +80,10 @@ pub fn resume_all(state: State<'_, AppState>) {
 pub fn open_file(app: AppHandle, state: State<'_, AppState>, id: DownloadId) -> CmdResult<()> {
     let d = state.engine.get(id).ok_or("download not found")?;
     if d.status != Status::Completed {
-        return Err("Tệp chưa tải xong".into());
+        return Err(tr!(
+            "Tệp chưa tải xong",
+            "The file has not finished downloading"
+        ));
     }
     app.opener()
         .open_path(d.file_path().to_string_lossy(), None::<&str>)
@@ -121,13 +125,22 @@ pub fn get_settings(state: State<'_, AppState>) -> SettingsDto {
 }
 
 #[tauri::command]
-pub fn save_settings(state: State<'_, AppState>, settings: SettingsDto) -> CmdResult<SettingsDto> {
+pub fn save_settings(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    settings: SettingsDto,
+) -> CmdResult<SettingsDto> {
     state.engine.update_settings(settings.engine).map_err(err)?;
     {
         let mut app = state.settings.write().unwrap();
         // The token and port are managed separately.
         app.confirm_captures = settings.app.confirm_captures;
         app.close_to_tray = settings.app.close_to_tray;
+        if app.language != settings.app.language {
+            app.language = settings.app.language;
+            i18n::set_preference(&app.language);
+            crate::tray::refresh_menu(&app_handle);
+        }
         app.save(&state.engine);
     }
     if settings.autostart != autostart::is_enabled() {
@@ -228,7 +241,10 @@ pub async fn list_releases() -> CmdResult<Vec<crate::updater::ReleaseInfo>> {
 #[tauri::command]
 pub fn open_url(app: AppHandle, url: String) -> CmdResult<()> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("Chỉ mở được liên kết http(s)".into());
+        return Err(tr!(
+            "Chỉ mở được liên kết http(s)",
+            "Only http(s) links can be opened"
+        ));
     }
     app.opener().open_url(url, None::<&str>).map_err(err)
 }

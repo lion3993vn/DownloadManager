@@ -7,6 +7,7 @@
 //! browsers and opens their extension page so the user only has to click
 //! "Load unpacked" and paste the path.
 
+use crate::i18n::tr;
 use crate::state::AppState;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -121,7 +122,12 @@ pub fn open_extensions_page(browser_id: &str) -> Result<(), String> {
     let b = detect_browsers()
         .into_iter()
         .find(|b| b.id == browser_id)
-        .ok_or("Không tìm thấy trình duyệt này")?;
+        .ok_or_else(|| {
+            tr!(
+                "Không tìm thấy trình duyệt này",
+                "This browser was not found"
+            )
+        })?;
     let args: Vec<String> = if b.engine == "firefox" {
         vec![b.extensions_url.to_string()]
     } else {
@@ -133,7 +139,9 @@ pub fn open_extensions_page(browser_id: &str) -> Result<(), String> {
         }
         a
     };
-    launch(&b.exe, &args).map_err(|e| format!("Không mở được {}: {e}", b.name))
+    let name = b.name;
+    launch(&b.exe, &args)
+        .map_err(|e| tr!("Không mở được {name}: {e}", "Could not open {name}: {e}"))
 }
 
 #[cfg(target_os = "macos")]

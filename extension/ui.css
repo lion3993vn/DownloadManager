@@ -506,7 +506,7 @@ body.popup {
   border-top: 1px solid var(--line);
 }
 .popup .setting.active-once .title::after {
-  content: "Đang bật";
+  content: attr(data-on-label); /* set from _locales by popup.js */
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 999px;

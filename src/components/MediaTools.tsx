@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, onToolsProgress, type ToolsProgress, type ToolsStatus } from "../lib/api";
 import { formatBytes } from "../lib/format";
+import { useT, type MessageKey } from "../i18n";
 import { DownloadIcon, RefreshIcon, TrashIcon, VideoIcon } from "./Icons";
 
-const STEP_LABEL: Record<ToolsProgress["step"], string> = {
-  "yt-dlp": "Đang tải yt-dlp",
-  ffmpeg: "Đang tải ffmpeg",
-  extract: "Đang giải nén ffmpeg",
-  update: "Đang cập nhật yt-dlp",
+const STEP_LABEL: Record<ToolsProgress["step"], MessageKey> = {
+  "yt-dlp": "media.step.ytdlp",
+  ffmpeg: "media.step.ffmpeg",
+  extract: "media.step.extract",
+  update: "media.step.update",
 };
 
 /** Install / update yt-dlp + ffmpeg with live progress. */
@@ -61,11 +62,12 @@ export function useMediaTools(onError: (msg: string) => void) {
 }
 
 function ProgressLine({ progress }: { progress: ToolsProgress | null }) {
+  const t = useT();
   const pct = progress?.total ? Math.min(100, (progress.downloaded / progress.total) * 100) : null;
   return (
     <div className="mt-3">
       <div className="mb-1 flex justify-between text-[11.5px] text-mute">
-        <span>{progress ? STEP_LABEL[progress.step] : "Đang chuẩn bị…"}</span>
+        <span>{progress ? t(STEP_LABEL[progress.step]) : t("media.preparing")}</span>
         {progress?.total ? (
           <span className="tabular-nums">
             {formatBytes(progress.downloaded)} / {formatBytes(progress.total)}
@@ -85,6 +87,7 @@ function ProgressLine({ progress }: { progress: ToolsProgress | null }) {
 
 /** Shown in the add dialog when a video page needs the tools first. */
 export function ToolsInstallCard({ onInstalled, onError }: { onInstalled: () => void; onError: (msg: string) => void }) {
+  const t = useT();
   const tools = useMediaTools(onError);
   return (
     <div className="animate-fade-in rounded-xl border border-brand/25 bg-brand/6 p-4">
@@ -93,17 +96,18 @@ export function ToolsInstallCard({ onInstalled, onError }: { onInstalled: () => 
           <VideoIcon className="h-[18px] w-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold text-ink">Cần cài công cụ tải video</div>
+          <div className="text-[13px] font-semibold text-ink">{t("media.card.title")}</div>
           <p className="mt-0.5 text-[12px] leading-relaxed text-mute">
-            Để tải từ YouTube, TikTok, Facebook… app dùng <b className="font-medium text-ink-2">yt-dlp</b>
+            {t("media.card.before")} <b className="font-medium text-ink-2">yt-dlp</b>
             {tools.status?.canInstallFfmpeg !== false && (
               <>
                 {" "}
-                và <b className="font-medium text-ink-2">ffmpeg</b>
+                {t("media.card.and")} <b className="font-medium text-ink-2">ffmpeg</b>
               </>
             )}{" "}
-            (mã nguồn mở). Chỉ cần cài một lần
-            {tools.status ? `, khoảng ${formatBytes(tools.status.installSize)}` : ""}. App tự cập nhật chúng về sau.
+            {t("media.card.after")}
+            {tools.status ? t("media.card.size", { size: formatBytes(tools.status.installSize) }) : ""}
+            {t("media.card.end")}
           </p>
           {tools.busy ? (
             <ProgressLine progress={tools.progress} />
@@ -115,7 +119,7 @@ export function ToolsInstallCard({ onInstalled, onError }: { onInstalled: () => 
                 if (await tools.install()) onInstalled();
               }}
             >
-              <DownloadIcon /> Cài đặt
+              <DownloadIcon /> {t("media.install")}
             </button>
           )}
         </div>
@@ -126,27 +130,34 @@ export function ToolsInstallCard({ onInstalled, onError }: { onInstalled: () => 
 
 /** Settings → Video. */
 export function MediaToolsPanel({ onError }: { onError: (msg: string) => void }) {
+  const t = useT();
   const tools = useMediaTools(onError);
   const s = tools.status;
-  if (!s) return <p className="py-6 text-[12.5px] text-mute">Đang kiểm tra…</p>;
+  if (!s) return <p className="py-6 text-[12.5px] text-mute">{t("media.checking")}</p>;
   const installed = s.ytdlpVersion != null;
   return (
     <div>
       <p className="text-[12.5px] leading-relaxed text-mute">
-        Tải video từ YouTube, TikTok, Facebook, Instagram, X, Vimeo… bằng <b className="font-medium text-ink-2">yt-dlp</b>. ffmpeg ghép hình
-        và tiếng (cần cho chất lượng trên 720p) và chuyển sang MP3.
+        {t("media.panel.introBefore")} <b className="font-medium text-ink-2">yt-dlp</b>
+        {t("media.panel.introAfter")}
       </p>
       <dl className="mt-4 divide-y divide-line rounded-xl border border-line text-[12.5px]">
         <div className="flex items-center justify-between px-4 py-3">
           <dt className="font-medium text-ink">yt-dlp</dt>
           <dd className={installed ? "text-emerald-600 dark:text-emerald-400" : "text-mute"}>
-            {installed ? `Đã cài · ${s.ytdlpVersion}` : "Chưa cài"}
+            {installed ? t("media.installedVersion", { version: s.ytdlpVersion ?? "" }) : t("media.notInstalled")}
           </dd>
         </div>
         <div className="flex items-center justify-between px-4 py-3">
           <dt className="font-medium text-ink">ffmpeg</dt>
           <dd className={s.ffmpeg ? "text-emerald-600 dark:text-emerald-400" : "text-mute"}>
-            {s.ffmpeg ? (s.ffmpegFromSystem ? "Có sẵn trên máy" : "Đã cài") : s.canInstallFfmpeg ? "Chưa cài" : "Chưa có (cài bằng Homebrew / trình quản lý gói)"}
+            {s.ffmpeg
+              ? s.ffmpegFromSystem
+                ? t("media.fromSystem")
+                : t("media.installed")
+              : s.canInstallFfmpeg
+                ? t("media.notInstalled")
+                : t("media.ffmpegManual")}
           </dd>
         </div>
       </dl>
@@ -156,21 +167,21 @@ export function MediaToolsPanel({ onError }: { onError: (msg: string) => void })
         <div className="mt-4 flex flex-wrap gap-2">
           {!installed || (s.canInstallFfmpeg && !s.ffmpeg) ? (
             <button className="btn-primary" onClick={tools.install}>
-              <DownloadIcon /> Cài đặt ({formatBytes(s.installSize)})
+              <DownloadIcon /> {t("media.installWithSize", { size: formatBytes(s.installSize) })}
             </button>
           ) : (
             <button className="btn-outline" onClick={tools.update}>
-              <RefreshIcon /> Cập nhật yt-dlp
+              <RefreshIcon /> {t("media.updateYtdlp")}
             </button>
           )}
           {installed && (
             <button className="btn-ghost text-red-600 dark:text-red-400" onClick={tools.remove}>
-              <TrashIcon /> Gỡ công cụ
+              <TrashIcon /> {t("media.remove")}
             </button>
           )}
         </div>
       )}
-      <p className="mt-4 text-[11.5px] text-mute">yt-dlp được tự cập nhật mỗi ngày, vì các trang video hay thay đổi cách phát.</p>
+      <p className="mt-4 text-[11.5px] text-mute">{t("media.autoUpdate")}</p>
     </div>
   );
 }

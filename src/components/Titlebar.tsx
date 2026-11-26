@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DownloadIcon, PanelLeftIcon } from "./Icons";
+import { useT } from "../i18n";
 
 /**
  * On Windows the window has no native frame (`tauri.windows.conf.json`), so the
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function Titlebar({ sidebarCollapsed, onToggleSidebar }: Props) {
+  const t = useT();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -46,8 +48,8 @@ export function Titlebar({ sidebarCollapsed, onToggleSidebar }: Props) {
       <button
         onClick={onToggleSidebar}
         className="ml-1.5 flex h-7 w-8 items-center justify-center rounded-md text-mute transition hover:bg-ink/[0.07] hover:text-ink"
-        title={sidebarCollapsed ? "Mở rộng thanh bên (Ctrl B)" : "Thu gọn thanh bên (Ctrl B)"}
-        aria-label={sidebarCollapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+        title={`${t(sidebarCollapsed ? "shell.expandSidebar" : "shell.collapseSidebar")} (Ctrl B)`}
+        aria-label={t(sidebarCollapsed ? "shell.expandSidebar" : "shell.collapseSidebar")}
       >
         <PanelLeftIcon className="h-[15px] w-[15px]" />
       </button>
@@ -60,18 +62,18 @@ export function Titlebar({ sidebarCollapsed, onToggleSidebar }: Props) {
       </div>
       <div data-tauri-drag-region className="h-full flex-1" />
       <div className="flex h-full">
-        <button className={`${caption} hover:bg-ink/[0.07]`} onClick={() => win.minimize()} title="Thu nhỏ" aria-label="Thu nhỏ">
+        <button className={`${caption} hover:bg-ink/[0.07]`} onClick={() => win.minimize()} title={t("shell.minimize")} aria-label={t("shell.minimize")}>
           <Glyph d={MINIMIZE} />
         </button>
         <button
           className={`${caption} hover:bg-ink/[0.07]`}
           onClick={() => win.toggleMaximize()}
-          title={maximized ? "Khôi phục" : "Phóng to"}
-          aria-label={maximized ? "Khôi phục" : "Phóng to"}
+          title={t(maximized ? "shell.restore" : "shell.maximize")}
+          aria-label={t(maximized ? "shell.restore" : "shell.maximize")}
         >
           <Glyph d={maximized ? RESTORE : MAXIMIZE} />
         </button>
-        <button className={`${caption} hover:bg-[#c42b1c] hover:text-white`} onClick={() => win.close()} title="Đóng" aria-label="Đóng">
+        <button className={`${caption} hover:bg-[#c42b1c] hover:text-white`} onClick={() => win.close()} title={t("common.close")} aria-label={t("common.close")}>
           <Glyph d={CLOSE} />
         </button>
       </div>

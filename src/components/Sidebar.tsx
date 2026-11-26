@@ -19,6 +19,7 @@ import {
   VideoIcon,
 } from "./Icons";
 import type { FileKind } from "../lib/format";
+import { useT, type MessageKey } from "../i18n";
 
 type IconT = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -26,20 +27,20 @@ export type StatusFilter = "all" | "active" | "unfinished" | "completed";
 export type Filter = { kind: "status"; key: StatusFilter } | { kind: "type"; key: FileKind };
 export type View = "downloads" | "stats";
 
-export const STATUS_FILTERS: { key: StatusFilter; label: string; icon: IconT }[] = [
-  { key: "all", label: "Tất cả", icon: LayersIcon },
-  { key: "active", label: "Đang tải", icon: DownloadIcon },
-  { key: "unfinished", label: "Chưa xong", icon: ClockIcon },
-  { key: "completed", label: "Hoàn tất", icon: CheckIcon },
+export const STATUS_FILTERS: { key: StatusFilter; label: MessageKey; icon: IconT }[] = [
+  { key: "all", label: "sidebar.filter.all", icon: LayersIcon },
+  { key: "active", label: "sidebar.filter.active", icon: DownloadIcon },
+  { key: "unfinished", label: "sidebar.filter.unfinished", icon: ClockIcon },
+  { key: "completed", label: "sidebar.filter.completed", icon: CheckIcon },
 ];
 
-export const TYPE_FILTERS: { key: FileKind; label: string; icon: IconT }[] = [
-  { key: "video", label: "Video", icon: VideoIcon },
-  { key: "audio", label: "Âm nhạc", icon: MusicIcon },
-  { key: "archive", label: "Tệp nén", icon: ArchiveIcon },
-  { key: "document", label: "Tài liệu", icon: DocIcon },
-  { key: "program", label: "Chương trình", icon: AppIcon },
-  { key: "image", label: "Hình ảnh", icon: ImageIcon },
+export const TYPE_FILTERS: { key: FileKind; label: MessageKey; icon: IconT }[] = [
+  { key: "video", label: "sidebar.type.video", icon: VideoIcon },
+  { key: "audio", label: "sidebar.type.audio", icon: MusicIcon },
+  { key: "archive", label: "sidebar.type.archive", icon: ArchiveIcon },
+  { key: "document", label: "sidebar.type.document", icon: DocIcon },
+  { key: "program", label: "sidebar.type.program", icon: AppIcon },
+  { key: "image", label: "sidebar.type.image", icon: ImageIcon },
 ];
 
 interface Props {
@@ -122,8 +123,9 @@ function RailButton({ collapsed, title, icon, onClick, className = "", children 
 }
 
 export function Sidebar(p: Props) {
+  const t = useT();
   const browsers = [...new Set(p.extensions.map((e) => e.browser))];
-  const types = TYPE_FILTERS.filter((t) => (p.typeCounts[t.key] ?? 0) > 0);
+  const types = TYPE_FILTERS.filter((f) => (p.typeCounts[f.key] ?? 0) > 0);
   const c = p.collapsed;
   const inList = p.view === "downloads";
 
@@ -147,15 +149,15 @@ export function Sidebar(p: Props) {
               </div>
               <div className="min-w-0 flex-1 leading-tight whitespace-nowrap">
                 <div className="text-[14px] font-semibold tracking-tight">DownloadManager</div>
-                <div className="text-[11px] text-mute">Tải đa luồng</div>
+                <div className="text-[11px] text-mute">{t("sidebar.tagline")}</div>
               </div>
             </>
           )}
           <button
             onClick={p.onToggleCollapsed}
             className="icon-btn h-7 w-7"
-            title={c ? "Mở rộng thanh bên (Ctrl B)" : "Thu gọn thanh bên (Ctrl B)"}
-            aria-label={c ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
+            title={`${t(c ? "sidebar.expand" : "sidebar.collapse")} (Ctrl B)`}
+            aria-label={t(c ? "sidebar.expand" : "sidebar.collapse")}
           >
             <PanelLeftIcon className="h-4 w-4" />
           </button>
@@ -164,12 +166,12 @@ export function Sidebar(p: Props) {
 
       <div className={`${c ? "px-2.5" : "px-3"} ${p.showBrand ? "" : "pt-4"}`}>
         {c ? (
-          <button className="btn-primary h-10 w-10 p-0" onClick={p.onAdd} title="Thêm liên kết (Ctrl N)" aria-label="Thêm liên kết">
+          <button className="btn-primary h-10 w-10 p-0" onClick={p.onAdd} title={`${t("sidebar.addLink")} (Ctrl N)`} aria-label={t("sidebar.addLink")}>
             <PlusIcon className="h-[18px] w-[18px]" strokeWidth={2.4} />
           </button>
         ) : (
           <button className="btn-primary w-full py-2.5 whitespace-nowrap" onClick={p.onAdd}>
-            <PlusIcon className="h-4 w-4" strokeWidth={2.4} /> Thêm liên kết
+            <PlusIcon className="h-4 w-4" strokeWidth={2.4} /> {t("sidebar.addLink")}
             <kbd className="ml-auto rounded bg-white/20 px-1.5 py-px font-sans text-[10px] font-medium">Ctrl N</kbd>
           </button>
         )}
@@ -181,7 +183,7 @@ export function Sidebar(p: Props) {
             <Item
               key={f.key}
               icon={f.icon}
-              label={f.label}
+              label={t(f.label)}
               count={p.statusCounts[f.key]}
               collapsed={c}
               active={inList && p.filter.kind === "status" && p.filter.key === f.key}
@@ -194,14 +196,14 @@ export function Sidebar(p: Props) {
             {c ? (
               <div className="mx-2 mb-2 h-px bg-line" />
             ) : (
-              <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase">Loại tệp</p>
+              <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase">{t("sidebar.fileTypes")}</p>
             )}
             <div className="space-y-0.5">
               {types.map((f) => (
                 <Item
                   key={f.key}
                   icon={f.icon}
-                  label={f.label}
+                  label={t(f.label)}
                   count={p.typeCounts[f.key]}
                   collapsed={c}
                   active={inList && p.filter.kind === "type" && p.filter.key === f.key}
@@ -215,16 +217,16 @@ export function Sidebar(p: Props) {
           {c ? (
             <div className="mx-2 mb-2 h-px bg-line" />
           ) : (
-            <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase">Tổng quan</p>
+            <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-faint uppercase">{t("sidebar.overview")}</p>
           )}
-          <Item icon={ChartIcon} label="Thống kê" collapsed={c} active={p.view === "stats"} onClick={p.onStats} />
+          <Item icon={ChartIcon} label={t("sidebar.stats")} collapsed={c} active={p.view === "stats"} onClick={p.onStats} />
         </div>
       </nav>
 
       <div className={`space-y-2 border-t border-line ${c ? "px-2.5 py-3" : "p-3"}`}>
         {browsers.length === 0 ? (
           c ? (
-            <RailButton collapsed title="Kết nối trình duyệt" icon={<PuzzleIcon className="h-[18px] w-[18px]" />} onClick={p.onInstallExtension} className="bg-gradient-to-br from-brand to-brand-2 text-white shadow-md shadow-brand/25 hover:brightness-110">
+            <RailButton collapsed title={t("sidebar.connectBrowser")} icon={<PuzzleIcon className="h-[18px] w-[18px]" />} onClick={p.onInstallExtension} className="bg-gradient-to-br from-brand to-brand-2 text-white shadow-md shadow-brand/25 hover:brightness-110">
               {null}
             </RailButton>
           ) : (
@@ -233,64 +235,64 @@ export function Sidebar(p: Props) {
               className="group w-full overflow-hidden rounded-xl bg-gradient-to-br from-brand to-brand-2 p-3.5 text-left text-white shadow-lg shadow-brand/25 transition hover:brightness-110"
             >
               <div className="flex items-center gap-2 text-[13px] font-semibold whitespace-nowrap">
-                <PuzzleIcon className="h-4 w-4" /> Kết nối trình duyệt
+                <PuzzleIcon className="h-4 w-4" /> {t("sidebar.connectBrowser")}
               </div>
-              <p className="mt-1 text-[11.5px] leading-snug text-white/85">Tự bắt link tải từ Chrome, Edge, Cốc Cốc, Firefox…</p>
+              <p className="mt-1 text-[11.5px] leading-snug text-white/85">{t("sidebar.connectBrowserHint")}</p>
               <span className="mt-2.5 inline-flex items-center rounded-md bg-white/20 px-2 py-1 text-[11.5px] font-medium group-hover:bg-white/30">
-                Cài extension →
+                {t("sidebar.installExtension")}
               </span>
             </button>
           )
         ) : (
           <RailButton
             collapsed={c}
-            title={`${p.bridgeRunning ? "Đã kết nối trình duyệt" : "Cầu nối đang tắt"}: ${browsers.join(", ")}`}
+            title={`${t(p.bridgeRunning ? "sidebar.browserConnected" : "sidebar.bridgeOff")}: ${browsers.join(", ")}`}
             icon={bridgeDot}
             onClick={p.onInstallExtension}
             className="hover:bg-ink/[0.045]"
           >
-            <span className="block truncate text-[12px] font-medium text-ink-2">{p.bridgeRunning ? "Đã kết nối trình duyệt" : "Cầu nối đang tắt"}</span>
+            <span className="block truncate text-[12px] font-medium text-ink-2">{t(p.bridgeRunning ? "sidebar.browserConnected" : "sidebar.bridgeOff")}</span>
             <span className="block truncate text-[11px] text-mute">{browsers.join(", ")}</span>
           </RailButton>
         )}
         {p.outdatedExtensions.length > 0 && (
           <RailButton
             collapsed={c}
-            title={`Đang cập nhật extension: ${p.outdatedExtensions.map((e) => e.browser).join(", ")}`}
+            title={`${t("sidebar.updatingExtension")}: ${p.outdatedExtensions.map((e) => e.browser).join(", ")}`}
             icon={<PuzzleIcon className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />}
             onClick={p.onInstallExtension}
             className="border border-amber-500/35 bg-amber-500/10 hover:bg-amber-500/15"
           >
-            <span className="block truncate text-[12px] font-semibold text-amber-700 dark:text-amber-300">Đang cập nhật extension</span>
+            <span className="block truncate text-[12px] font-semibold text-amber-700 dark:text-amber-300">{t("sidebar.updatingExtension")}</span>
             <span className="block truncate text-[11px] text-mute">
-              {p.outdatedExtensions.map((e) => e.browser).join(", ")} · lên v{p.bundledExtension}
+              {p.outdatedExtensions.map((e) => e.browser).join(", ")} · {t("sidebar.updatingExtensionTo", { version: p.bundledExtension ?? "" })}
             </span>
           </RailButton>
         )}
         {p.update && (
           <RailButton
             collapsed={c}
-            title={`Có bản mới v${p.update.version}`}
+            title={t("sidebar.newVersion", { version: p.update.version })}
             icon={<SparklesIcon className="h-4 w-4 shrink-0 text-brand" />}
             onClick={p.onChangelog}
             className="border border-brand/30 bg-brand/8 hover:bg-brand/12"
           >
-            <span className="block truncate text-[12px] font-semibold text-brand">Có bản mới v{p.update.version}</span>
-            <span className="block truncate text-[11px] text-mute">Bấm để cập nhật</span>
+            <span className="block truncate text-[12px] font-semibold text-brand">{t("sidebar.newVersion", { version: p.update.version })}</span>
+            <span className="block truncate text-[11px] text-mute">{t("sidebar.clickToUpdate")}</span>
           </RailButton>
         )}
         {c ? (
-          <RailButton collapsed title="Cài đặt" icon={<SettingsIcon className="h-[17px] w-[17px] text-mute" />} onClick={p.onSettings} className="hover:bg-ink/[0.045]">
+          <RailButton collapsed title={t("sidebar.settings")} icon={<SettingsIcon className="h-[17px] w-[17px] text-mute" />} onClick={p.onSettings} className="hover:bg-ink/[0.045]">
             {null}
           </RailButton>
         ) : (
           <div className="flex items-center">
             <button onClick={p.onSettings} className="flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-[13px] whitespace-nowrap text-ink-2 hover:bg-ink/[0.045]">
-              <SettingsIcon className="h-[17px] w-[17px] text-mute" /> Cài đặt
+              <SettingsIcon className="h-[17px] w-[17px] text-mute" /> {t("sidebar.settings")}
             </button>
             <button
               onClick={p.onChangelog}
-              title="Cập nhật & nhật ký thay đổi"
+              title={t("sidebar.changelog")}
               className="relative rounded-md px-2 py-1 text-[11px] tabular-nums text-faint hover:bg-ink/[0.045] hover:text-ink-2"
             >
               {p.version ? `v${p.version}` : "…"}

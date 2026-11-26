@@ -1,4 +1,5 @@
 import type { SegmentInfo, Status } from "../lib/api";
+import { useT } from "../i18n";
 
 interface Props {
   segments: SegmentInfo[];
@@ -58,6 +59,7 @@ export function SegmentBar({ segments, total, downloaded, status, height = "h-1.
 
 /** Grid of per-connection mini bars for the details panel. */
 export function SegmentMap({ segments, status }: { segments: SegmentInfo[]; status: Status }) {
+  const t = useT();
   const fill = FILL[status];
   const sorted = [...segments].sort((a, b) => a.start - b.start);
   return (
@@ -66,7 +68,7 @@ export function SegmentMap({ segments, status }: { segments: SegmentInfo[]; stat
         const len = s.end - s.start;
         const pct = len > 0 ? Math.min(100, (s.done / len) * 100) : 100;
         return (
-          <div key={s.start} className="rounded-md bg-track/70 p-1.5" title={`Đoạn ${i + 1}: ${pct.toFixed(0)}%`}>
+          <div key={s.start} className="rounded-md bg-track/70 p-1.5" title={t("shell.segment", { n: i + 1, pct: pct.toFixed(0) })}>
             <div className="mb-1 flex justify-between text-[10px] tabular-nums text-mute">
               <span>#{i + 1}</span>
               <span>{pct.toFixed(0)}%</span>

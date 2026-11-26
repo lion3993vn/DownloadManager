@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { api, outdatedExtensions, type BrowserInfo, type ConnectedExtension, type ExtensionSetupInfo } from "../lib/api";
+import { useT } from "../i18n";
 import { Modal } from "./Modal";
 import { CheckCircleIcon, CheckIcon, ClipboardIcon, FolderIcon, GlobeIcon, InfoIcon, OpenIcon, PuzzleIcon } from "./Icons";
 
@@ -21,6 +22,14 @@ const GLYPH: Record<string, string> = {
   vivaldi: "from-rose-500 to-red-600",
   firefox: "from-orange-500 via-pink-500 to-purple-600",
 };
+
+/** Fill `{name}` placeholders of a translated string with React nodes. */
+function rich(text: string, nodes: Record<string, ReactNode>): ReactNode {
+  return text.split(/(\{\w+\})/).map((part, i) => {
+    const name = /^\{(\w+)\}$/.exec(part)?.[1];
+    return <Fragment key={i}>{name && name in nodes ? nodes[name] : part}</Fragment>;
+  });
+}
 
 function BrowserGlyph({ b, size = "h-9 w-9" }: { b: BrowserInfo; size?: string }) {
   const letter = b.name === "Cốc Cốc" ? "C" : b.name.replace(/^(Google|Microsoft) /, "")[0];
@@ -51,6 +60,7 @@ function Step({ n, done, title, children }: { n: number; done?: boolean; title: 
 }
 
 function PathBox({ path, onCopy, copied, onReveal }: { path: string; onCopy: () => void; copied: string | null; onReveal: () => void }) {
+  const t = useT();
   const isCopied = copied === path;
   return (
     <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-line bg-panel p-1.5 pl-3">
@@ -58,9 +68,9 @@ function PathBox({ path, onCopy, copied, onReveal }: { path: string; onCopy: () 
         {path}
       </code>
       <button className="btn-outline px-2.5 py-1 text-[12px]" onClick={onCopy}>
-        {isCopied ? <CheckIcon className="text-emerald-500" /> : <ClipboardIcon />} {isCopied ? "Đã chép" : "Chép"}
+        {isCopied ? <CheckIcon className="text-emerald-500" /> : <ClipboardIcon />} {isCopied ? t("common.copied") : t("common.copy")}
       </button>
-      <button className="btn-ghost px-2 py-1" onClick={onReveal} title="Mở thư mục">
+      <button className="btn-ghost px-2 py-1" onClick={onReveal} title={t("wizard.openFolder")}>
         <FolderIcon />
       </button>
     </div>
@@ -72,7 +82,13 @@ const K = ({ children }: { children: ReactNode }) => (
   <span className="rounded-md border border-line bg-panel px-1.5 py-px text-[11.5px] font-medium whitespace-nowrap text-ink-2">{children}</span>
 );
 
+/** Bold app/button name inside a sentence. */
+const B = ({ children }: { children: ReactNode }) => <b className="font-medium text-ink-2">{children}</b>;
+
+const PASTE_KEYS = { paste: <K>Ctrl V</K>, enter: <K>Enter</K> };
+
 export function ExtensionWizard({ connected, bundledVersion, onClose, onError }: Props) {
+  const t = useT();
   const outdated = outdatedExtensions(connected, bundledVersion);
   const outdatedFor = (b: BrowserInfo) => outdated.find((e) => e.browser === b.name) ?? null;
   const [info, setInfo] = useState<ExtensionSetupInfo | null>(null);
@@ -121,8 +137,8 @@ export function ExtensionWizard({ connected, bundledVersion, onClose, onError }:
 
   return (
     <Modal
-      title="Kết nối trình duyệt"
-      subtitle="Cài extension để DownloadManager tự bắt mọi lượt tải từ trình duyệt."
+      title={t("wizard.title")}
+      subtitle={t("wizard.subtitle")}
       icon={<PuzzleIcon />}
       onClose={onClose}
       width="max-w-[780px]"
@@ -130,22 +146,22 @@ export function ExtensionWizard({ connected, bundledVersion, onClose, onError }:
       footer={
         <>
           <span className="mr-auto flex items-center gap-1.5 text-[12px] text-mute">
-            <InfoIcon className="h-3.5 w-3.5" /> Extension tự ghép cặp với app — không cần nhập mã.
+            <InfoIcon className="h-3.5 w-3.5" /> {t("wizard.autoPair")}
           </span>
           <button className="btn-primary" onClick={onClose}>
-            {connected.length ? "Xong" : "Để sau"}
+            {connected.length ? t("wizard.done") : t("wizard.later")}
           </button>
         </>
       }
     >
       {!info ? (
-        <div className="px-6 py-16 text-center text-mute">Đang chuẩn bị extension…</div>
+        <div className="px-6 py-16 text-center text-mute">{t("wizard.preparing")}</div>
       ) : (
         <div className="grid min-h-[380px] grid-cols-[230px_minmax(0,1fr)] border-t border-line">
           {/* Browser picker */}
           <div className="space-y-1 border-r border-line bg-panel/50 p-3">
-            <p className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-faint uppercase">Trình duyệt trên máy</p>
-            {info.browsers.length === 0 && <p className="px-2 text-[12px] text-mute">Không tìm thấy trình duyệt quen thuộc.</p>}
+            <p className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-faint uppercase">{t("wizard.browsers")}</p>
+            {info.browsers.length === 0 && <p className="px-2 text-[12px] text-mute">{t("wizard.noBrowsers")}</p>}
             {info.browsers.map((b) => (
               <button
                 key={b.id}
@@ -158,10 +174,10 @@ export function ExtensionWizard({ connected, bundledVersion, onClose, onError }:
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-ink">{b.name}</span>
                   {outdatedFor(b) ? (
-                    <span className="block text-[11px] text-amber-600 dark:text-amber-400">● Cần cập nhật</span>
+                    <span className="block text-[11px] text-amber-600 dark:text-amber-400">{t("wizard.needsUpdate")}</span>
                   ) : (
                     <span className={`block text-[11px] ${isConnected(b) ? "text-emerald-600" : "text-mute"}`}>
-                      {isConnected(b) ? "● Đã kết nối" : "Chưa cài"}
+                      {isConnected(b) ? t("wizard.connected") : t("wizard.notInstalled")}
                     </span>
                   )}
                 </span>
@@ -191,53 +207,56 @@ export function ExtensionWizard({ connected, bundledVersion, onClose, onError }:
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-500">
                   <CheckCircleIcon className="h-9 w-9" />
                 </div>
-                <h3 className="mt-4 text-[16px] font-semibold text-ink">{browser.name} đã kết nối</h3>
-                <p className="mt-1 max-w-sm text-[12.5px] text-mute">
-                  Từ giờ các tệp tải từ {browser.name} sẽ tự chuyển sang DownloadManager. Nếu app không chạy, trình duyệt vẫn tải như bình
-                  thường.
-                </p>
+                <h3 className="mt-4 text-[16px] font-semibold text-ink">{t("wizard.connectedTitle", { name: browser.name })}</h3>
+                <p className="mt-1 max-w-sm text-[12.5px] text-mute">{t("wizard.connectedBody", { name: browser.name })}</p>
               </div>
             ) : browser.engine === "chromium" ? (
               <ol>
-                <Step n={1} done={opened[browser.id]} title={`Mở trang tiện ích của ${browser.name}`}>
+                <Step n={1} done={opened[browser.id]} title={t("wizard.openExtPage", { name: browser.name })}>
                   <button className="btn-primary mt-0.5" onClick={() => openBrowser(browser)}>
-                    <OpenIcon /> Mở {browser.name}
+                    <OpenIcon /> {t("wizard.open", { name: browser.name })}
                   </button>
                   <p className="mt-2">
                     {copied === browser.extensionsUrl ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">Đã chép địa chỉ <K>{browser.extensionsUrl}</K>. </span>
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {rich(t("wizard.urlCopied"), { url: <K>{browser.extensionsUrl}</K> })}
+                      </span>
                     ) : (
-                      <>App sẽ chép sẵn địa chỉ <K>{browser.extensionsUrl}</K>. </>
+                      rich(t("wizard.urlWillCopy"), { url: <K>{browser.extensionsUrl}</K> })
                     )}
-                    Trong cửa sổ vừa mở: dán vào thanh địa chỉ <K>Ctrl V</K> rồi nhấn <K>Enter</K>.
+                    {rich(t("wizard.pasteUrl"), PASTE_KEYS)}
                   </p>
                 </Step>
-                <Step n={2} title={<>Bật <K>Chế độ dành cho nhà phát triển</K> (Developer mode)</>}>
-                  Công tắc ở góc trên bên phải trang tiện ích{browser.id === "edge" ? " (Edge: ở cột bên trái)" : ""}.
+                <Step n={2} title={rich(t("wizard.devModeStep"), { devMode: <K>{t("wizard.devModeLabel")}</K> })}>
+                  {browser.id === "edge" ? t("wizard.devModeHintEdge") : t("wizard.devModeHint")}
                 </Step>
-                <Step n={3} title={<>Bấm <K>Tải tiện ích đã giải nén</K> (Load unpacked) và chọn thư mục này</>}>
-                  Bấm <b className="font-medium text-ink-2">Chép</b>, rồi trong hộp chọn thư mục dán <K>Ctrl V</K> vào ô địa chỉ và bấm <K>Chọn thư mục</K>.
+                <Step n={3} title={rich(t("wizard.loadUnpackedStep"), { loadUnpacked: <K>{t("wizard.loadUnpackedLabel")}</K> })}>
+                  {rich(t("wizard.loadUnpackedHint"), {
+                    copy: <B>{t("common.copy")}</B>,
+                    paste: <K>Ctrl V</K>,
+                    selectFolder: <K>{t("wizard.selectFolder")}</K>,
+                  })}
                   <PathBox path={info.folder} copied={copied} onCopy={() => copy(info.folder)} onReveal={reveal} />
                 </Step>
-                <Step n={4} title="Chờ kết nối">
+                <Step n={4} title={t("wizard.waitStep")}>
                   <Waiting />
                 </Step>
               </ol>
             ) : (
               <ol>
-                <Step n={1} done={opened[browser.id]} title="Mở trang gỡ lỗi tiện ích của Firefox">
+                <Step n={1} done={opened[browser.id]} title={t("wizard.ffOpenPage")}>
                   <button className="btn-primary mt-0.5" onClick={() => openBrowser(browser)}>
-                    <OpenIcon /> Mở Firefox
+                    <OpenIcon /> {t("wizard.open", { name: "Firefox" })}
                   </button>
                 </Step>
-                <Step n={2} title={<>Bấm <K>Load Temporary Add-on…</K> và chọn tệp manifest.json</>}>
-                  Đường dẫn đã được chép sẵn khi mở Firefox — dán vào ô tên tệp:
+                <Step n={2} title={rich(t("wizard.ffLoadStep"), { loadTemp: <K>Load Temporary Add-on…</K> })}>
+                  {t("wizard.ffPathHint")}
                   <PathBox path={info.manifestPath} copied={copied} onCopy={() => copy(info.manifestPath)} onReveal={reveal} />
                 </Step>
-                <Step n={3} title="Chờ kết nối">
+                <Step n={3} title={t("wizard.waitStep")}>
                   <Waiting />
                   <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
-                    Firefox chỉ cho cài tạm extension chưa được Mozilla ký — sẽ tự gỡ khi tắt Firefox. Nên dùng Chrome/Edge/Cốc Cốc để dùng lâu dài.
+                    {t("wizard.ffTemporary")}
                   </p>
                 </Step>
               </ol>
@@ -250,30 +269,29 @@ export function ExtensionWizard({ connected, bundledVersion, onClose, onError }:
 }
 
 function Waiting() {
+  const t = useT();
   return (
     <div>
       <span className="inline-flex items-center gap-2 text-[12.5px] text-mute">
         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
-        Đang chờ extension kết nối với app…
+        {t("wizard.waiting")}
       </span>
-      <p className="mt-1.5 text-[12px] text-mute">
-        Đã cài mà chưa thấy? Bấm biểu tượng <b className="font-medium text-ink-2">DownloadManager</b> trên thanh công cụ của trình duyệt
-        (hình mảnh ghép 🧩 nếu đang bị ẩn) để kết nối ngay.
-      </p>
+      <p className="mt-1.5 text-[12px] text-mute">{rich(t("wizard.waitingHint"), { app: <B>DownloadManager</B> })}</p>
     </div>
   );
 }
 
 function GenericSteps({ folder, copied, onCopy, onReveal }: { folder: string; copied: string | null; onCopy: () => void; onReveal: () => void }) {
+  const t = useT();
   return (
     <ol>
-      <Step n={1} title="Mở trang quản lý tiện ích của trình duyệt">
+      <Step n={1} title={t("wizard.genericOpen")}>
         <span className="flex items-center gap-1.5">
           <GlobeIcon className="h-3.5 w-3.5" /> Chrome: <K>chrome://extensions</K> · Edge: <K>edge://extensions</K>
         </span>
       </Step>
-      <Step n={2} title={<>Bật <K>Developer mode</K> rồi bấm <K>Load unpacked</K></>} />
-      <Step n={3} title="Chọn thư mục extension">
+      <Step n={2} title={rich(t("wizard.genericDevMode"), { devMode: <K>Developer mode</K>, loadUnpacked: <K>Load unpacked</K> })} />
+      <Step n={3} title={t("wizard.genericFolder")}>
         <PathBox path={folder} copied={copied} onCopy={onCopy} onReveal={onReveal} />
       </Step>
     </ol>
@@ -302,12 +320,13 @@ function UpdateSteps(p: {
   onCopy: (text: string) => void;
   onReveal: () => void;
 }) {
+  const t = useT();
   const firefox = p.browser.engine === "firefox";
   const [manual, setManual] = useState(false);
   useEffect(() => {
     setManual(false);
-    const t = setTimeout(() => setManual(true), MANUAL_UPDATE_AFTER_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setManual(true), MANUAL_UPDATE_AFTER_MS);
+    return () => clearTimeout(timer);
   }, [p.browser.id]);
 
   return (
@@ -315,20 +334,21 @@ function UpdateSteps(p: {
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
         <span className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand/25 border-t-brand" />
         <div className="text-[12.5px] leading-relaxed text-ink-2">
-          <b className="font-semibold text-ink">Extension trên {p.browser.name} đang tự cập nhật</b>
+          <b className="font-semibold text-ink">{t("wizard.updating", { name: p.browser.name })}</b>
           <span className="block text-mute">
-            {p.current ? <K>v{p.current}</K> : "Bản cũ"} → <K>v{p.latest}</K> · không cần làm gì, thường xong trong khoảng 30 giây khi{" "}
-            {p.browser.name} đang mở.
+            {rich(t("wizard.updatingBody", { name: p.browser.name }), {
+              from: p.current ? <K>v{p.current}</K> : t("wizard.oldVersion"),
+              to: <K>v{p.latest}</K>,
+            })}
           </span>
           <span className="mt-1.5 block text-mute">
-            Muốn nhanh hơn: mở hoặc tải lại một trang web bất kỳ trong {p.browser.name}, hoặc bấm biểu tượng{" "}
-            <b className="font-medium text-ink-2">DownloadManager</b> trên thanh công cụ.
+            {rich(t("wizard.updatingFaster", { name: p.browser.name }), { app: <B>DownloadManager</B> })}
           </span>
         </div>
       </div>
       {!manual ? (
         <button className="btn-ghost px-2 py-1 text-[12px] text-mute" onClick={() => setManual(true)}>
-          Chưa thấy cập nhật? Làm thủ công
+          {t("wizard.manualButton")}
         </button>
       ) : (
         <ManualUpdateSteps {...p} firefox={firefox} />
@@ -339,38 +359,32 @@ function UpdateSteps(p: {
 
 /** The old flow: reload the extension by hand in the browser's extension page. */
 function ManualUpdateSteps(p: Parameters<typeof UpdateSteps>[0] & { firefox: boolean }) {
+  const t = useT();
   const firefox = p.firefox;
   return (
     <div>
-      <p className="mb-3 text-[12.5px] text-mute">Vẫn chưa được? Tải lại extension bằng tay (chỉ cần một lần):</p>
+      <p className="mb-3 text-[12.5px] text-mute">{t("wizard.manualIntro")}</p>
       <ol>
-        <Step n={1} done={p.opened} title={firefox ? "Mở trang gỡ lỗi tiện ích của Firefox" : `Mở trang tiện ích của ${p.browser.name}`}>
+        <Step n={1} done={p.opened} title={firefox ? t("wizard.ffOpenPage") : t("wizard.openExtPage", { name: p.browser.name })}>
           <button className="btn-primary mt-0.5" onClick={p.onOpen}>
-            <OpenIcon /> Mở {p.browser.name}
+            <OpenIcon /> {t("wizard.open", { name: p.browser.name })}
           </button>
           {!firefox && (
-            <p className="mt-2">
-              App sẽ chép sẵn địa chỉ <K>{p.browser.extensionsUrl}</K>, dán vào thanh địa chỉ <K>Ctrl V</K> rồi nhấn <K>Enter</K>.
-            </p>
+            <p className="mt-2">{rich(t("wizard.manualPaste"), { url: <K>{p.browser.extensionsUrl}</K>, ...PASTE_KEYS })}</p>
           )}
         </Step>
         <Step
           n={2}
           title={
-            firefox ? (
-              <>Bấm <K>Reload</K> ở mục DownloadManager Connector</>
-            ) : (
-              <>Bấm nút tải lại <K>↻</K> trên thẻ DownloadManager Connector</>
-            )
+            firefox
+              ? rich(t("wizard.ffReload"), { reload: <K>Reload</K> })
+              : rich(t("wizard.reloadCard"), { icon: <K>↻</K> })
           }
         >
-          Từ bản này trở đi, extension tự cập nhật mỗi khi app có bản mới.
+          {t("wizard.selfUpdateNote")}
         </Step>
-        <Step n={3} title="Chờ extension báo phiên bản mới">
-          <p>
-            Vẫn báo cũ? Có thể extension được cài từ thư mục khác. Gỡ nó đi rồi cài lại từ{" "}
-            {firefox ? "tệp manifest.json" : "thư mục"} này:
-          </p>
+        <Step n={3} title={t("wizard.waitVersion")}>
+          <p>{firefox ? t("wizard.reinstallFile") : t("wizard.reinstallFolder")}</p>
           <PathBox
             path={firefox ? p.manifestPath : p.folder}
             copied={p.copied}

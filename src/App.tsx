@@ -17,6 +17,7 @@ import { fileKind, type FileKind } from "./lib/format";
 import { useTheme } from "./lib/theme";
 import { useDownloads, type Row } from "./lib/useDownloads";
 import { useUpdater } from "./lib/useUpdater";
+import { normalizePref, setLanguagePref, t as tr, useT } from "./i18n";
 import { ChangelogDialog } from "./components/ChangelogDialog";
 import { AddDialog } from "./components/AddDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
@@ -59,6 +60,7 @@ export default function App() {
   const { rows, loaded } = useDownloads();
   const [theme, setTheme] = useTheme();
   const { toasts, push, dismiss } = useToasts();
+  const t = useT();
 
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>({ kind: "status", key: "all" });
@@ -100,19 +102,22 @@ export default function App() {
   const updater = useUpdater((u) =>
     push({
       kind: "info",
-      title: `Có phiên bản mới v${u.version}`,
-      body: "Xem có gì mới và cập nhật chỉ với một nút bấm.",
-      action: { label: "Xem & cập nhật", run: () => setShowChangelog(true) },
+      title: tr("app.updateAvailable", { version: u.version }),
+      body: tr("app.updateAvailableBody"),
+      action: { label: tr("app.viewAndUpdate"), run: () => setShowChangelog(true) },
     }),
   );
   const availableUpdate = updater.state.kind === "available" ? updater.state.update : null;
 
-  const showError = useCallback((msg: string) => push({ kind: "error", title: "Có lỗi xảy ra", body: msg }), [push]);
+  const showError = useCallback((msg: string) => push({ kind: "error", title: tr("app.errorTitle"), body: msg }), [push]);
   const run = useCallback((p: Promise<unknown>) => p.catch((e) => showError(String(e))), [showError]);
 
   // Initial data + backend events.
   useEffect(() => {
-    api.getSettings().then(setSettings);
+    api.getSettings().then((s) => {
+      setLanguagePref(normalizePref(s.app.language));
+      setSettings(s);
+    });
     const refreshBridge = () => api.bridgeStatus().then(setBridge);
     refreshBridge();
     const t = setInterval(refreshBridge, 5000);
@@ -128,9 +133,9 @@ export default function App() {
       if (old.length) {
         push({
           kind: "info",
-          title: `Đang cập nhật extension trên ${old.map((e) => e.browser).join(", ")}`,
-          body: `Extension sẽ tự nạp bản v${bundled} trong giây lát khi trình duyệt đang mở.`,
-          action: { label: "Chi tiết", run: () => setShowWizard(true) },
+          title: tr("app.extUpdating", { browsers: old.map((e) => e.browser).join(", ") }),
+          body: tr("app.extUpdatingBody", { version: bundled ?? "" }),
+          action: { label: tr("app.details"), run: () => setShowWizard(true) },
         });
       }
       let onboarded = false;
@@ -151,18 +156,18 @@ export default function App() {
         if (outdatedExtensions([e], bundledExtRef.current).length) {
           push({
             kind: "info",
-            title: `Đã kết nối ${e.browser}, extension đang tự cập nhật`,
-            body: `${e.version ? `v${e.version}` : "Bản cũ"} → v${bundledExtRef.current}, thường xong trong khoảng 30 giây.`,
-            action: { label: "Chi tiết", run: () => setShowWizard(true) },
+            title: tr("app.extConnectedUpdating", { browser: e.browser }),
+            body: tr("app.extConnectedUpdatingBody", { from: e.version ? `v${e.version}` : tr("app.oldVersion"), to: bundledExtRef.current ?? "" }),
+            action: { label: tr("app.details"), run: () => setShowWizard(true) },
           });
         } else {
-          push({ kind: "success", title: `Đã kết nối ${e.browser}`, body: "Lượt tải từ trình duyệt sẽ tự chuyển sang app." });
+          push({ kind: "success", title: tr("app.extConnected", { browser: e.browser }), body: tr("app.extConnectedBody") });
         }
       }),
       onExtensionUpdated((e) => {
         setExtensions((old) => [...old.filter((x) => x.origin !== e.origin), e]);
         if (!outdatedExtensions([e], bundledExtRef.current).length) {
-          push({ kind: "success", title: `Đã cập nhật extension trên ${e.browser}`, body: `Phiên bản v${e.version}` });
+          push({ kind: "success", title: tr("app.extUpdated", { browser: e.browser }), body: tr("app.extUpdatedBody", { version: e.version ?? "" }) });
         }
       }),
     ];
@@ -191,9 +196,9 @@ export default function App() {
       const before = prev.get(r.id);
       if (before && before !== r.status) {
         if (r.status === "completed") {
-          push({ kind: "success", title: "Tải xong", body: r.fileName, action: { label: "Mở tệp", run: () => run(api.openFile(r.id)) } });
+          push({ kind: "success", title: tr("app.downloadDone"), body: r.fileName, action: { label: tr("app.openFile"), run: () => run(api.openFile(r.id)) } });
         } else if (r.status === "failed") {
-          push({ kind: "error", title: `Lỗi: ${r.fileName}`, body: r.error ?? undefined });
+          push({ kind: "error", title: tr("app.failed", { name: r.fileName }), body: r.error ?? undefined });
         }
       }
       prev.set(r.id, r.status);
@@ -236,15 +241,15 @@ export default function App() {
 
   function menuItems(r: Row): MenuItem[] {
     const items: MenuItem[] = [];
-    if (r.status === "completed") items.push({ label: "Mở tệp", icon: <OpenIcon />, onClick: () => actions.open(r) });
-    if (r.status === "downloading" || r.status === "queued") items.push({ label: "Tạm dừng", icon: <PauseIcon />, onClick: () => actions.pause(r) });
-    if (r.status === "paused") items.push({ label: "Tiếp tục", icon: <PlayIcon />, onClick: () => actions.resume(r) });
-    if (r.status === "failed" || r.status === "canceled") items.push({ label: "Tải lại", icon: <RetryIcon />, onClick: () => actions.resume(r) });
-    items.push({ label: "Mở thư mục", icon: <FolderIcon />, onClick: () => actions.folder(r) });
-    items.push({ label: "Chép liên kết", icon: <CopyIcon />, onClick: () => navigator.clipboard.writeText(r.url) });
+    if (r.status === "completed") items.push({ label: t("app.openFile"), icon: <OpenIcon />, onClick: () => actions.open(r) });
+    if (r.status === "downloading" || r.status === "queued") items.push({ label: t("app.pause"), icon: <PauseIcon />, onClick: () => actions.pause(r) });
+    if (r.status === "paused") items.push({ label: t("app.resume"), icon: <PlayIcon />, onClick: () => actions.resume(r) });
+    if (r.status === "failed" || r.status === "canceled") items.push({ label: t("app.redownload"), icon: <RetryIcon />, onClick: () => actions.resume(r) });
+    items.push({ label: t("app.openFolder"), icon: <FolderIcon />, onClick: () => actions.folder(r) });
+    items.push({ label: t("app.copyLink"), icon: <CopyIcon />, onClick: () => navigator.clipboard.writeText(r.url) });
     if (r.status !== "completed" && r.status !== "canceled")
-      items.push({ label: "Hủy tải", icon: <StopIcon />, onClick: () => run(api.cancel(r.id)), separatorBefore: true });
-    items.push({ label: "Xóa…", icon: <TrashIcon />, danger: true, onClick: () => setConfirmRemove(r), separatorBefore: r.status === "completed" || r.status === "canceled" });
+      items.push({ label: t("app.cancelDownload"), icon: <StopIcon />, onClick: () => run(api.cancel(r.id)), separatorBefore: true });
+    items.push({ label: t("app.remove"), icon: <TrashIcon />, danger: true, onClick: () => setConfirmRemove(r), separatorBefore: r.status === "completed" || r.status === "canceled" });
     return items;
   }
 
@@ -278,7 +283,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const title = filter.kind === "status" ? STATUS_FILTERS.find((f) => f.key === filter.key)!.label : TYPE_FILTERS.find((f) => f.key === filter.key)!.label;
+  const title = t(filter.kind === "status" ? STATUS_FILTERS.find((f) => f.key === filter.key)!.label : TYPE_FILTERS.find((f) => f.key === filter.key)!.label);
   const hasActive = all.some((r) => r.status === "downloading" || r.status === "queued");
   const hasPaused = all.some((r) => r.status === "paused");
   const outdated = useMemo(() => outdatedExtensions(extensions, bundledExt), [extensions, bundledExt]);
@@ -326,17 +331,17 @@ export default function App() {
               <header className="flex items-center gap-3 px-5 pt-5 pb-4">
                 <div className="min-w-0 flex-1">
                   <h1 className="text-[20px] font-semibold tracking-tight">{title}</h1>
-                  <p className="text-[12px] text-mute">{visible.length} tệp</p>
+                  <p className="text-[12px] text-mute">{t("app.fileCount", { n: visible.length })}</p>
                 </div>
                 <div className="relative">
                   <SearchIcon className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint" />
-                  <input id="search" className="field w-44 rounded-full py-1.5 pl-9 @[820px]:w-64" placeholder="Tìm theo tên hoặc liên kết…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                  <input id="search" className="field w-44 rounded-full py-1.5 pl-9 @[820px]:w-64" placeholder={t("app.searchPlaceholder")} value={query} onChange={(e) => setQuery(e.target.value)} />
                 </div>
-                <button className="btn-outline" disabled={!hasPaused} onClick={() => run(api.resumeAll())} title="Tiếp tục tất cả">
-                  <PlayIcon /> <span className="hidden @[700px]:inline">Tiếp tục hết</span>
+                <button className="btn-outline" disabled={!hasPaused} onClick={() => run(api.resumeAll())} title={t("app.resumeAll")}>
+                  <PlayIcon /> <span className="hidden @[700px]:inline">{t("app.resumeAllShort")}</span>
                 </button>
-                <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title="Tạm dừng tất cả">
-                  <PauseIcon /> <span className="hidden @[700px]:inline">Dừng hết</span>
+                <button className="btn-outline" disabled={!hasActive} onClick={() => run(api.pauseAll())} title={t("app.pauseAll")}>
+                  <PauseIcon /> <span className="hidden @[700px]:inline">{t("app.pauseAllShort")}</span>
                 </button>
               </header>
 
@@ -387,7 +392,7 @@ export default function App() {
           defaultDir={settings.engine.downloadDir}
           defaultConnections={settings.engine.connections}
           onClose={() => setShowAdd(false)}
-          onAdded={(name, started) => push({ kind: "info", title: started ? "Đã bắt đầu tải" : "Đã thêm vào danh sách", body: name })}
+          onAdded={(name, started) => push({ kind: "info", title: t(started ? "app.started" : "app.addedToList"), body: name })}
           onError={showError}
         />
       )}
@@ -398,7 +403,7 @@ export default function App() {
           defaultDir={settings.engine.downloadDir}
           defaultConnections={settings.engine.connections}
           onClose={() => setCaptures((c) => c.slice(1))}
-          onAdded={(name, started) => push({ kind: "info", title: started ? "Đã bắt đầu tải" : "Đã thêm vào danh sách", body: name })}
+          onAdded={(name, started) => push({ kind: "info", title: t(started ? "app.started" : "app.addedToList"), body: name })}
           onError={showError}
         />
       )}
@@ -409,7 +414,7 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           onSaved={(s) => {
             setSettings(s);
-            push({ kind: "success", title: "Đã lưu cài đặt" });
+            push({ kind: "success", title: t("app.settingsSaved") });
           }}
           onError={showError}
           onInstallExtension={() => setShowWizard(true)}
@@ -446,11 +451,12 @@ export default function App() {
 }
 
 function EmptyState({ filtered, hasExtension, onAdd, onExtension }: { filtered: boolean; hasExtension: boolean; onAdd: () => void; onExtension: () => void }) {
+  const t = useT();
   if (filtered) {
     return (
       <div className="flex h-full flex-col items-center justify-center pb-16 text-center text-mute">
         <SearchIcon className="h-8 w-8 text-faint" />
-        <p className="mt-3 text-[13px]">Không có tệp nào khớp bộ lọc.</p>
+        <p className="mt-3 text-[13px]">{t("app.noMatch")}</p>
       </div>
     );
   }
@@ -462,17 +468,17 @@ function EmptyState({ filtered, hasExtension, onAdd, onExtension }: { filtered: 
           <DownloadIcon className="h-10 w-10" strokeWidth={2.2} />
         </div>
       </div>
-      <h2 className="mt-6 text-[18px] font-semibold tracking-tight">Chưa có lượt tải nào</h2>
+      <h2 className="mt-6 text-[18px] font-semibold tracking-tight">{t("app.emptyTitle")}</h2>
       <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-mute">
-        Dán một liên kết để tải nhanh hơn với nhiều kết nối song song, hoặc kết nối trình duyệt để tự động bắt mọi lượt tải.
+        {t("app.emptyBody")}
       </p>
       <div className="mt-6 flex gap-2.5">
         <button className="btn-primary px-4 py-2.5" onClick={onAdd}>
-          <LinkIcon /> Thêm liên kết
+          <LinkIcon /> {t("app.addLink")}
         </button>
         {!hasExtension && (
           <button className="btn-outline px-4 py-2.5" onClick={onExtension}>
-            <PuzzleIcon /> Kết nối trình duyệt
+            <PuzzleIcon /> {t("app.connectBrowser")}
           </button>
         )}
       </div>
@@ -481,37 +487,39 @@ function EmptyState({ filtered, hasExtension, onAdd, onExtension }: { filtered: 
 }
 
 function PairDialog({ pair, onAnswer }: { pair: PairRequest; onAnswer: (approve: boolean) => void }) {
+  const t = useT();
   return (
     <Modal
-      title="Cho phép extension kết nối?"
-      subtitle={`Từ ${pair.browser || "trình duyệt"}`}
+      title={t("app.pairTitle")}
+      subtitle={t("app.pairFrom", { browser: pair.browser || t("app.pairBrowserFallback") })}
       icon={<PuzzleIcon />}
       width="max-w-md"
       onClose={() => onAnswer(false)}
       footer={
         <>
           <button className="btn-ghost" onClick={() => onAnswer(false)}>
-            Từ chối
+            {t("app.deny")}
           </button>
           <button className="btn-primary" onClick={() => onAnswer(true)}>
-            Cho phép
+            {t("app.allow")}
           </button>
         </>
       }
     >
-      <p className="text-[13px] text-ink-2">Extension này muốn chuyển các lượt tải của trình duyệt sang DownloadManager.</p>
+      <p className="text-[13px] text-ink-2">{t("app.pairBody")}</p>
       <p className="mt-3 rounded-lg bg-panel px-3 py-2 font-mono text-[11px] break-all text-mute">{pair.origin}</p>
-      <p className="mt-3 text-[12px] text-mute">Chỉ cho phép nếu bạn vừa bấm “Kết nối” trong extension.</p>
+      <p className="mt-3 text-[12px] text-mute">{t("app.pairHint")}</p>
     </Modal>
   );
 }
 
 function RemoveDialog({ row, onClose, onConfirm }: { row: Row; onClose: () => void; onConfirm: (deleteFile: boolean) => void }) {
+  const t = useT();
   const [deleteFile, setDeleteFile] = useState(false);
   const done = row.status === "completed";
   return (
     <Modal
-      title="Xóa khỏi danh sách?"
+      title={t("app.removeTitle")}
       icon={<TrashIcon />}
       danger
       onClose={onClose}
@@ -519,10 +527,10 @@ function RemoveDialog({ row, onClose, onConfirm }: { row: Row; onClose: () => vo
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Hủy
+            {t("common.cancel")}
           </button>
           <button className="btn-danger" onClick={() => onConfirm(deleteFile)}>
-            Xóa
+            {t("app.removeConfirm")}
           </button>
         </>
       }
@@ -530,11 +538,11 @@ function RemoveDialog({ row, onClose, onConfirm }: { row: Row; onClose: () => vo
       <p className="text-[13px] break-all text-ink-2">
         <b className="text-ink">{row.fileName}</b>
       </p>
-      {!done && <p className="mt-2 text-[12.5px] text-mute">Phần đã tải dở sẽ bị xóa khỏi ổ đĩa.</p>}
+      {!done && <p className="mt-2 text-[12.5px] text-mute">{t("app.removePartial")}</p>}
       {done && (
         <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-lg border border-line px-3 py-2.5 text-[13px]">
           <input type="checkbox" className="h-4 w-4 accent-red-600" checked={deleteFile} onChange={(e) => setDeleteFile(e.target.checked)} />
-          Xóa luôn tệp trên ổ đĩa
+          {t("app.removeFileToo")}
         </label>
       )}
     </Modal>
